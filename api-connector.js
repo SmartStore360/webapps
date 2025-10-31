@@ -1,8 +1,9 @@
 /**
  * SMARTSTORE 360 - API CONNECTOR
- * Final working version
+ * Simple working version
  */
 
+// ⚠️ REPLACE THIS WITH YOUR NEW GAS URL AFTER DEPLOYMENT ⚠️
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxEPqPsH_DeH4KflEwHHStbjD4Bj5HnJQpsfkR67QvapG__zlzTYdX1q_FQpZdjggpMcA/exec';
 
 class GASConnector {
@@ -11,25 +12,17 @@ class GASConnector {
     }
 
     async callGASFunction(functionName, data = {}) {
-        console.log(`📞 Calling GAS: ${functionName}`, data);
-        
         return new Promise((resolve, reject) => {
-            const callbackName = `gas_${Date.now()}`;
+            const callbackName = `callback_${Date.now()}`;
             const timeoutId = setTimeout(() => {
-                this.cleanupJSONP(callbackName, script);
+                this.cleanup(callbackName, script);
                 reject(new Error('Timeout: Server took too long to respond'));
-            }, 30000);
+            }, 15000);
 
             window[callbackName] = (response) => {
-                console.log(`📨 GAS Response:`, response);
                 clearTimeout(timeoutId);
-                this.cleanupJSONP(callbackName, script);
-                
-                if (response && response.success !== false) {
-                    resolve(response);
-                } else {
-                    reject(new Error(response?.message || `Function ${functionName} failed`));
-                }
+                this.cleanup(callbackName, script);
+                resolve(response);
             };
 
             const params = new URLSearchParams();
@@ -44,34 +37,22 @@ class GASConnector {
             script.src = `${this.baseURL}?${params.toString()}`;
             script.onerror = () => {
                 clearTimeout(timeoutId);
-                this.cleanupJSONP(callbackName, script);
-                reject(new Error(`Cannot connect to Google Apps Script. Please check deployment settings.`));
+                this.cleanup(callbackName, script);
+                reject(new Error(`Cannot connect to: ${this.baseURL}. Please check:\n1. GAS is deployed as "Anyone"\n2. GAS has doPost() function\n3. Your internet connection`));
             };
 
             document.head.appendChild(script);
         });
     }
 
-    cleanupJSONP(callbackName, script) {
+    cleanup(callbackName, script) {
         try {
             delete window[callbackName];
             if (script && script.parentElement) {
                 script.parentElement.removeChild(script);
             }
-        } catch (error) {
-            console.warn('Cleanup warning:', error);
-        }
-    }
-
-    async callWithRetry(functionName, data = {}, maxRetries = 2) {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                return await this.callGASFunction(functionName, data);
-            } catch (error) {
-                console.log(`🔄 Attempt ${attempt} failed:`, error.message);
-                if (attempt === maxRetries) throw error;
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
+        } catch (e) {
+            // Ignore cleanup errors
         }
     }
 }
@@ -79,7 +60,7 @@ class GASConnector {
 // Create global instance
 const gasAPI = new GASConnector();
 
-// Mock google.script.run
+// Simple google.script.run mock
 window.google = window.google || {};
 window.google.script = window.google.script || {};
 window.google.script.run = {
@@ -94,144 +75,173 @@ window.google.script.run = {
     },
     
     testConnection() {
-        gasAPI.callGASFunction('testConnection')
+        gasAPI.callGASFunction('testConnection', {})
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     login(username, password) {
-        gasAPI.callWithRetry('login', { username, password })
+        gasAPI.callGASFunction('login', { username, password })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     getInventoryData() {
-        gasAPI.callWithRetry('getInventoryData')
+        gasAPI.callGASFunction('getInventoryData', {})
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     submitSaleData(saleData) {
-        gasAPI.callWithRetry('submitSaleData', saleData)
+        gasAPI.callGASFunction('submitSaleData', saleData)
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     generateReport(params) {
-        gasAPI.callWithRetry('generateReport', params)
+        gasAPI.callGASFunction('generateReport', params)
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     addInventoryItem(itemData, username) {
-        gasAPI.callWithRetry('addInventoryItem', { ...itemData, username })
+        gasAPI.callGASFunction('addInventoryItem', { ...itemData, username })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     updateInventoryItem(itemData, username) {
-        gasAPI.callWithRetry('updateInventoryItem', { ...itemData, username })
+        gasAPI.callGASFunction('updateInventoryItem', { ...itemData, username })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     deleteInventoryItem(itemName, username) {
-        gasAPI.callWithRetry('deleteInventoryItem', { itemName, username })
+        gasAPI.callGASFunction('deleteInventoryItem', { itemName, username })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     bulkUploadInventory(items, username) {
-        gasAPI.callWithRetry('bulkUploadInventory', { items, username })
+        gasAPI.callGASFunction('bulkUploadInventory', { items, username })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     getTodaysSalesBreakdown() {
-        gasAPI.callWithRetry('getTodaysSalesBreakdown')
+        gasAPI.callGASFunction('getTodaysSalesBreakdown', {})
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     getAllUsers() {
-        gasAPI.callWithRetry('getAllUsers')
+        gasAPI.callGASFunction('getAllUsers', {})
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     getAllUsernames() {
-        gasAPI.callWithRetry('getAllUsernames')
+        gasAPI.callGASFunction('getAllUsernames', {})
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     addUser(userData, currentUser) {
-        gasAPI.callWithRetry('addUser', { ...userData, currentUser })
+        gasAPI.callGASFunction('addUser', { ...userData, currentUser })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     deleteUser(username, currentUser) {
-        gasAPI.callWithRetry('deleteUser', { username, currentUser })
+        gasAPI.callGASFunction('deleteUser', { username, currentUser })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
     changePassword(currentUser, targetUser, newPassword, oldPassword, isManager) {
-        gasAPI.callWithRetry('changePassword', { currentUser, targetUser, newPassword, oldPassword, isManager })
+        gasAPI.callGASFunction('changePassword', { currentUser, targetUser, newPassword, oldPassword, isManager })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     }
 };
 
-// Test connection
+// Test connection with better error display
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(async () => {
-        const testDiv = document.createElement('div');
-        testDiv.style.cssText = `
+        const statusDiv = document.createElement('div');
+        statusDiv.style.cssText = `
             position: fixed;
             top: 10px;
             left: 50%;
             transform: translateX(-50%);
             background: #3b82f6;
             color: white;
-            padding: 10px 15px;
-            border-radius: 5px;
+            padding: 15px 20px;
+            border-radius: 8px;
             z-index: 10000;
             font-family: Arial, sans-serif;
             font-size: 14px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         `;
-        testDiv.textContent = '🔍 Testing connection to Google Apps Script...';
-        document.body.appendChild(testDiv);
+        statusDiv.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="spinner"></div>
+                <div>Testing connection to Google Apps Script...</div>
+            </div>
+            <style>
+                .spinner {
+                    width: 20px;
+                    height: 20px;
+                    border: 2px solid #ffffff;
+                    border-top: 2px solid transparent;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+        document.body.appendChild(statusDiv);
 
         try {
+            console.log('🔍 Testing GAS connection to:', GAS_WEB_APP_URL);
             const result = await gasAPI.callGASFunction('testConnection', {});
-            testDiv.style.background = '#10b981';
-            testDiv.innerHTML = '✅ Connected to Google Apps Script successfully!';
+            
+            statusDiv.style.background = '#10b981';
+            statusDiv.innerHTML = `
+                ✅ <strong>Connected Successfully!</strong>
+                <br><small>Google Apps Script is now connected</small>
+            `;
             console.log('✅ GAS Connection successful:', result);
             
-            setTimeout(() => testDiv.remove(), 5000);
+            setTimeout(() => statusDiv.remove(), 5000);
         } catch (error) {
-            testDiv.style.background = '#ef4444';
-            testDiv.innerHTML = `
-                ❌ Connection Failed
+            statusDiv.style.background = '#ef4444';
+            statusDiv.innerHTML = `
+                ❌ <strong>Connection Failed</strong>
                 <br><small>${error.message}</small>
-                <br><small>Check GAS deployment and doPost() function</small>
+                <br><small style="font-size: 12px; opacity: 0.8;">
+                    Please check your GAS deployment settings
+                </small>
             `;
             console.error('❌ GAS Connection failed:', error);
         }
