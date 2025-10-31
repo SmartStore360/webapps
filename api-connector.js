@@ -1,190 +1,314 @@
-// SMARTSTORE 360 API CONNECTOR - UPDATED
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzHuHzK0H0OI0LrwAYY7taRKBw5d7Q76Vzr0v7FY37RwssszhkeCYMYRRfijMci5iym9Q/exec';
+/**
+ * SmartStore 360 - GAS API Connector
+ * Complete connection handler for Google Apps Script backend
+ */
 
-function callGAS(functionName, data = {}) {
-    return new Promise((resolve, reject) => {
-        const callbackName = `gas_${Date.now()}`;
+class GASConnector {
+    constructor() {
+        this.baseUrl = 'https://script.google.com/macros/s/AKfycbzHuHzK0H0OI0LrwAYY7taRKBw5d7Q76Vzr0v7FY37RwssszhkeCYMYRRfijMci5iym9Q/exec';
+        this.isConnected = false;
+        this.retryCount = 0;
+        this.maxRetries = 3;
         
-        window[callbackName] = function(response) {
-            delete window[callbackName];
-            if (script.parentNode) script.parentNode.removeChild(script);
-            console.log('✅ GAS Response:', response);
-            resolve(response);
-        };
+        // Initialize connection
+        this.init();
+    }
 
-        const params = new URLSearchParams();
-        params.append('function', functionName);
-        params.append('callback', callbackName);
-        if (Object.keys(data).length > 0) {
-            params.append('data', JSON.stringify(data));
+    init() {
+        console.log('🔌 GAS Connector Initializing...');
+        this.setupErrorHandling();
+    }
+
+    setupErrorHandling() {
+        window.addEventListener('online', () => {
+            console.log('🌐 Internet connection restored');
+            this.testConnection();
+        });
+
+        window.addEventListener('offline', () => {
+            console.warn('⚠️ Internet connection lost');
+            this.isConnected = false;
+        });
+    }
+
+    /**
+     * Test connection to GAS backend
+     */
+    async testConnection() {
+        console.log('🔍 Testing GAS connection...');
+        
+        try {
+            const url = `${this.baseUrl}?action=test&timestamp=${Date.now()}`;
+            console.log('🔗 Calling GAS URL:', url);
+
+            const response = await this.makeRequest(url);
+            
+            this.isConnected = true;
+            this.retryCount = 0;
+            
+            console.log('✅ GAS Connection successful:', response);
+            this.onConnectionSuccess(response);
+            
+            return response;
+            
+        } catch (error) {
+            this.isConnected = false;
+            this.retryCount++;
+            
+            console.error('❌ GAS Connection failed:', error);
+            this.onConnectionError(error);
+            
+            // Auto-retry with exponential backoff
+            if (this.retryCount <= this.maxRetries) {
+                const delay = Math.pow(2, this.retryCount) * 1000;
+                console.log(`🔄 Retrying in ${delay}ms... (Attempt ${this.retryCount})`);
+                
+                setTimeout(() => this.testConnection(), delay);
+            }
+            
+            throw error;
         }
+    }
 
-        const script = document.createElement('script');
-        const fullUrl = `${GAS_WEB_APP_URL}?${params.toString()}`;
-        console.log('🔗 Calling GAS URL:', fullUrl);
-        script.src = fullUrl;
-        
-        script.onerror = function() {
-            delete window[callbackName];
-            if (script.parentNode) script.parentNode.removeChild(script);
-            console.error('❌ Script load failed');
-            reject(new Error(`Failed to connect to Google Apps Script`));
+    /**
+     * Generic request handler
+     */
+    async makeRequest(url, options = {}) {
+        const defaultOptions = {
+            method: 'GET',
+            mode: 'cors',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            timeout: 10000
         };
 
-        document.head.appendChild(script);
-    });
+        const mergedOptions = { ...defaultOptions, ...options };
+        
+        // Add timestamp to avoid caching
+        const finalUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), mergedOptions.timeout);
+        mergedOptions.signal = controller.signal;
+
+        try {
+            const response = await fetch(finalUrl, mergedOptions);
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const text = await response.text();
+            
+            // Try to parse as JSON, fallback to text
+            try {
+                return JSON.parse(text);
+            } catch {
+                return text;
+            }
+            
+        } catch (error) {
+            clearTimeout(timeoutId);
+            
+            if (error.name === 'AbortError') {
+                throw new Error('Request timeout - GAS backend not responding');
+            }
+            
+            throw error;
+        }
+    }
+
+    /**
+     * PRODUCT MANAGEMENT
+     */
+    async getProducts(category = 'all') {
+        try {
+            const url = `${this.baseUrl}?action=getProducts&category=${encodeURIComponent(category)}`;
+            return await this.makeRequest(url);
+        } catch (error) {
+            console.error('❌ Failed to fetch products:', error);
+            throw error;
+        }
+    }
+
+    async addProduct(productData) {
+        try {
+            const url = `${this.baseUrl}?action=addProduct`;
+            return await this.makeRequest(url, {
+                method: 'POST',
+                body: JSON.stringify(productData)
+            });
+        } catch (error) {
+            console.error('❌ Failed to add product:', error);
+            throw error;
+        }
+    }
+
+    async updateProduct(productId, productData) {
+        try {
+            const url = `${this.baseUrl}?action=updateProduct&id=${encodeURIComponent(productId)}`;
+            return await this.makeRequest(url, {
+                method: 'POST',
+                body: JSON.stringify(productData)
+            });
+        } catch (error) {
+            console.error('❌ Failed to update product:', error);
+            throw error;
+        }
+    }
+
+    async deleteProduct(productId) {
+        try {
+            const url = `${this.baseUrl}?action=deleteProduct&id=${encodeURIComponent(productId)}`;
+            return await this.makeRequest(url, {
+                method: 'POST'
+            });
+        } catch (error) {
+            console.error('❌ Failed to delete product:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * ORDER MANAGEMENT
+     */
+    async getOrders(status = 'all') {
+        try {
+            const url = `${this.baseUrl}?action=getOrders&status=${encodeURIComponent(status)}`;
+            return await this.makeRequest(url);
+        } catch (error) {
+            console.error('❌ Failed to fetch orders:', error);
+            throw error;
+        }
+    }
+
+    async createOrder(orderData) {
+        try {
+            const url = `${this.baseUrl}?action=createOrder`;
+            return await this.makeRequest(url, {
+                method: 'POST',
+                body: JSON.stringify(orderData)
+            });
+        } catch (error) {
+            console.error('❌ Failed to create order:', error);
+            throw error;
+        }
+    }
+
+    async updateOrderStatus(orderId, status) {
+        try {
+            const url = `${this.baseUrl}?action=updateOrderStatus&id=${encodeURIComponent(orderId)}&status=${encodeURIComponent(status)}`;
+            return await this.makeRequest(url, {
+                method: 'POST'
+            });
+        } catch (error) {
+            console.error('❌ Failed to update order status:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * INVENTORY MANAGEMENT
+     */
+    async getInventory() {
+        try {
+            const url = `${this.baseUrl}?action=getInventory`;
+            return await this.makeRequest(url);
+        } catch (error) {
+            console.error('❌ Failed to fetch inventory:', error);
+            throw error;
+        }
+    }
+
+    async updateStock(productId, newQuantity) {
+        try {
+            const url = `${this.baseUrl}?action=updateStock&id=${encodeURIComponent(productId)}&quantity=${newQuantity}`;
+            return await this.makeRequest(url, {
+                method: 'POST'
+            });
+        } catch (error) {
+            console.error('❌ Failed to update stock:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * ANALYTICS & REPORTS
+     */
+    async getSalesReport(startDate, endDate) {
+        try {
+            const url = `${this.baseUrl}?action=getSalesReport&start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`;
+            return await this.makeRequest(url);
+        } catch (error) {
+            console.error('❌ Failed to fetch sales report:', error);
+            throw error;
+        }
+    }
+
+    async getDashboardData() {
+        try {
+            const url = `${this.baseUrl}?action=getDashboardData`;
+            return await this.makeRequest(url);
+        } catch (error) {
+            console.error('❌ Failed to fetch dashboard data:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Event handlers
+     */
+    onConnectionSuccess(response) {
+        // Dispatch custom event for other components to listen to
+        const event = new CustomEvent('gas-connected', { 
+            detail: { response, timestamp: new Date() }
+        });
+        window.dispatchEvent(event);
+        
+        // Update UI state if needed
+        if (window.updateConnectionStatus) {
+            window.updateConnectionStatus(true);
+        }
+    }
+
+    onConnectionError(error) {
+        // Dispatch custom event for connection errors
+        const event = new CustomEvent('gas-error', { 
+            detail: { error, timestamp: new Date() }
+        });
+        window.dispatchEvent(event);
+        
+        // Update UI state if needed
+        if (window.updateConnectionStatus) {
+            window.updateConnectionStatus(false);
+        }
+    }
+
+    /**
+     * Utility methods
+     */
+    getConnectionStatus() {
+        return {
+            isConnected: this.isConnected,
+            retryCount: this.retryCount,
+            baseUrl: this.baseUrl
+        };
+    }
+
+    resetConnection() {
+        this.retryCount = 0;
+        this.isConnected = false;
+        return this.testConnection();
+    }
 }
 
-// Mock google.script.run
-window.google = window.google || {};
-window.google.script = window.google.script || {};
-window.google.script.run = {
-    withSuccessHandler(callback) {
-        this.successCallback = callback;
-        return this;
-    },
-    withFailureHandler(callback) {
-        this.failureCallback = callback;
-        return this;
-    },
-    
-    testConnection() {
-        callGAS('testConnection').then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    login(username, password) {
-        callGAS('login', { username, password }).then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    getInventoryData() {
-        callGAS('getInventoryData').then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    submitSaleData(saleData) {
-        callGAS('submitSaleData', saleData).then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    generateReport(params) {
-        callGAS('generateReport', params).then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    addInventoryItem(itemData, username) {
-        callGAS('addInventoryItem', { ...itemData, username }).then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    updateInventoryItem(itemData, username) {
-        callGAS('updateInventoryItem', { ...itemData, username }).then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    deleteInventoryItem(itemName, username) {
-        callGAS('deleteInventoryItem', { itemName, username }).then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    bulkUploadInventory(items, username) {
-        callGAS('bulkUploadInventory', { items, username }).then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    getTodaysSalesBreakdown() {
-        callGAS('getTodaysSalesBreakdown').then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    getAllUsers() {
-        callGAS('getAllUsers').then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    getAllUsernames() {
-        callGAS('getAllUsernames').then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    addUser(userData, currentUser) {
-        callGAS('addUser', { ...userData, currentUser }).then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    deleteUser(username, currentUser) {
-        callGAS('deleteUser', { username, currentUser }).then(this.successCallback).catch(this.failureCallback);
-        return this;
-    },
-    changePassword(currentUser, targetUser, newPassword, oldPassword, isManager) {
-        callGAS('changePassword', { currentUser, targetUser, newPassword, oldPassword, isManager }).then(this.successCallback).catch(this.failureCallback);
-        return this;
-    }
-};
+// Create global instance
+const gasAPI = new GASConnector();
 
-// Test connection on load
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-        const status = document.createElement('div');
-        status.style.cssText = `
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #3b82f6;
-            color: white;
-            padding: 15px 25px;
-            border-radius: 8px;
-            z-index: 10000;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            max-width: 90%;
-        `;
-        status.innerHTML = '🔄 Testing Connection to Google Apps Script...';
-        document.body.appendChild(status);
-
-        console.log('🔍 Testing GAS connection...');
-        callGAS('testConnection')
-            .then(result => {
-                status.style.background = '#10b981';
-                status.innerHTML = '✅ Connected Successfully!<br><small>You can now login with admin/admin</small>';
-                console.log('✅ GAS Connection successful:', result);
-                setTimeout(() => status.remove(), 5000);
-            })
-            .catch(error => {
-                status.style.background = '#ef4444';
-                status.innerHTML = `❌ Connection Failed<br><small>${error.message}</small><br><small>Check GAS deployment settings</small>`;
-                console.error('❌ GAS Connection failed:', error);
-            });
-    }, 1000);
-});
-// Backend Service Module
-const BackendService = {
-  baseUrl: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec',
-  
-  async testConnection() {
-    try {
-      const timestamp = new Date().getTime();
-      const url = `${this.baseUrl}?t=${timestamp}`; // Avoid cache
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('🎉 Backend connection successful!', data);
-      return data;
-    } catch (error) {
-      console.error('💥 Backend connection failed:', error);
-      return null;
-    }
-  }
-};
-
-// Test the connection when app starts
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('🚀 SmartStore 360 App Initializing...');
-  
-  // Test backend connection after a short delay
-  setTimeout(() => {
-    BackendService.testConnection();
-  }, 1000);
-  
-  console.log('✅ SmartStore 360 App Ready!');
-});
+// Export for module systems
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { GASConnector, gasAPI };
+}
