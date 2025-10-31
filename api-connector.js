@@ -1,200 +1,66 @@
 /**
  * SMARTSTORE 360 - API CONNECTOR
- * Handles all communication with Google Apps Script backend
- * Solves CORS issues for GitHub Pages deployment
+ * Using your actual GAS URL
  */
 
-// CONFIGURATION - UPDATE THIS WITH YOUR GAS WEB APP URL
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxSpy3MfKkb00DXYHAuBlhSiWZXnwtJfAe8wzxDqzTy1BojSM_lhKIsycXpIGKDDt_u-Q/exec';
 
-// API Connector Class
 class GASConnector {
     constructor() {
         this.baseURL = GAS_WEB_APP_URL;
-        this.requestId = 0;
-        this.pendingRequests = new Map();
     }
 
-    /**
-     * Main method to call GAS functions - handles CORS and errors
-     */
-    async callGASFunction(functionName, data = {}, options = {}) {
-        const requestId = ++this.requestId;
-        const timeout = options.timeout || 30000; // 30 seconds default
-        
-        console.log(`🔗 Calling GAS function: ${functionName}`, data);
-
-        try {
-            // Method 1: Try JSONP first (best for CORS)
-            if (this.supportsJSONP()) {
-                return await this.jsonpRequest(functionName, data, timeout);
-            }
-            
-            // Method 2: Try fetch with no-cors mode
-            return await this.fetchRequest(functionName, data, timeout);
-            
-        } catch (error) {
-            console.error(`❌ GAS API Error (${functionName}):`, error);
-            
-            // Show user-friendly error message
-            this.showConnectionError(error, functionName);
-            throw error;
-        }
-    }
-
-    /**
-     * JSONP Method - Works around CORS completely
-     */
-    jsonpRequest(functionName, data, timeout) {
+    async callGASFunction(functionName, data = {}) {
         return new Promise((resolve, reject) => {
-            const callbackName = `gas_callback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
-            // Set timeout
+            const callbackName = `gas_callback_${Date.now()}`;
             const timeoutId = setTimeout(() => {
-                delete window[callbackName];
-                document.head.removeChild(script);
-                reject(new Error(`Request timeout after ${timeout}ms`));
-            }, timeout);
+                this.cleanupJSONP(callbackName, script);
+                reject(new Error('Request timeout after 30 seconds'));
+            }, 30000);
 
-            // Create callback function
             window[callbackName] = (response) => {
                 clearTimeout(timeoutId);
-                delete window[callbackName];
-                document.head.removeChild(script);
+                this.cleanupJSONP(callbackName, script);
                 
                 if (response && response.success !== false) {
                     resolve(response);
                 } else {
-                    reject(new Error(response?.message || 'Unknown error from server'));
+                    reject(new Error(response?.message || 'Server returned an error'));
                 }
             };
 
-            // Build URL with parameters
             const params = new URLSearchParams();
             params.append('function', functionName);
             params.append('callback', callbackName);
             
-            // Add data as JSON string
             if (Object.keys(data).length > 0) {
                 params.append('data', JSON.stringify(data));
             }
 
-            // Create script tag
             const script = document.createElement('script');
             script.src = `${this.baseURL}?${params.toString()}`;
             script.onerror = () => {
                 clearTimeout(timeoutId);
-                delete window[callbackName];
-                reject(new Error('Failed to load script - check GAS URL'));
+                this.cleanupJSONP(callbackName, script);
+                reject(new Error(`Failed to load script. Check GAS deployment settings.`));
             };
 
             document.head.appendChild(script);
         });
     }
 
-    /**
-     * Fetch Method - Fallback when JSONP not available
-     */
-    async fetchRequest(functionName, data, timeout) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
+    cleanupJSONP(callbackName, script) {
         try {
-            const formData = new FormData();
-            formData.append('function', functionName);
-            
-            if (Object.keys(data).length > 0) {
-                formData.append('data', JSON.stringify(data));
+            delete window[callbackName];
+            if (script && script.parentElement) {
+                script.parentElement.removeChild(script);
             }
-
-            const response = await fetch(this.baseURL, {
-                method: 'POST',
-                body: formData,
-                signal: controller.signal,
-                mode: 'no-cors' // This helps with some CORS issues
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            // With no-cors mode, we can't read the response, so we'll assume success
-            // Your GAS should handle the actual processing
-            return { success: true, message: 'Request sent successfully' };
-            
         } catch (error) {
-            clearTimeout(timeoutId);
-            if (error.name === 'AbortError') {
-                throw new Error(`Request timeout after ${timeout}ms`);
-            }
-            throw error;
+            console.warn('Cleanup error:', error);
         }
     }
 
-    /**
-     * Check if JSONP is supported
-     */
-    supportsJSONP() {
-        return typeof window !== 'undefined' && !window.isSecureContext;
-    }
-
-    /**
-     * Show user-friendly connection errors
-     */
-    showConnectionError(error, functionName) {
-        let message = 'Connection error: ';
-        
-        if (error.message.includes('timeout')) {
-            message += 'Server is taking too long to respond. Please try again.';
-        } else if (error.message.includes('Failed to load')) {
-            message += 'Cannot connect to server. Check your GAS URL and internet connection.';
-        } else if (error.message.includes('check GAS URL')) {
-            message += 'Invalid GAS Web App URL. Please update the configuration.';
-        } else {
-            message += error.message || 'Unknown error occurred.';
-        }
-
-        // Create alert element
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'alert bg-error';
-        alertDiv.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <span>${message}</span>
-                <button onclick="this.parentElement.parentElement.remove()" 
-                        style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">
-                    ×
-                </button>
-            </div>
-        `;
-        
-        document.body.appendChild(alertDiv);
-        
-        // Auto-remove after 10 seconds
-        setTimeout(() => {
-            if (alertDiv.parentElement) {
-                alertDiv.remove();
-            }
-        }, 10000);
-    }
-
-    /**
-     * Test connection to GAS backend
-     */
-    async testConnection() {
-        try {
-            const result = await this.callGASFunction('testConnection', {}, { timeout: 10000 });
-            return { connected: true, message: 'Connection successful' };
-        } catch (error) {
-            return { connected: false, message: error.message };
-        }
-    }
-
-    /**
-     * Retry mechanism for failed requests
-     */
-    async callWithRetry(functionName, data = {}, maxRetries = 3, delay = 1000) {
+    async callWithRetry(functionName, data = {}, maxRetries = 3) {
         let lastError;
         
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -203,101 +69,19 @@ class GASConnector {
                 return await this.callGASFunction(functionName, data);
             } catch (error) {
                 lastError = error;
-                
                 if (attempt < maxRetries) {
-                    console.log(`⏳ Retrying in ${delay}ms...`);
-                    await this.sleep(delay);
-                    delay *= 2; // Exponential backoff
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
                 }
             }
         }
-        
         throw lastError;
     }
-
-    /**
-     * Utility sleep function
-     */
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
 }
 
-/**
- * INDIVIDUAL API METHODS
- * These match your GAS backend functions
- */
-
-// Create global connector instance
+// Create global instance
 const gasAPI = new GASConnector();
 
-// Authentication
-async function login(username, password) {
-    return await gasAPI.callWithRetry('login', { username, password });
-}
-
-async function changePassword(currentUser, targetUser, newPassword, oldPassword = '', isManager = false) {
-    return await gasAPI.callWithRetry('changePassword', {
-        currentUser, targetUser, newPassword, oldPassword, isManager
-    });
-}
-
-// Inventory Management
-async function getInventoryData() {
-    return await gasAPI.callWithRetry('getInventoryData');
-}
-
-async function addInventoryItem(itemData, username) {
-    return await gasAPI.callWithRetry('addInventoryItem', { ...itemData, username });
-}
-
-async function updateInventoryItem(itemData, username) {
-    return await gasAPI.callWithRetry('updateInventoryItem', { ...itemData, username });
-}
-
-async function deleteInventoryItem(itemName, username) {
-    return await gasAPI.callWithRetry('deleteInventoryItem', { itemName, username });
-}
-
-async function bulkUploadInventory(items, username) {
-    return await gasAPI.callWithRetry('bulkUploadInventory', { items, username });
-}
-
-// Sales Management
-async function submitSaleData(saleData) {
-    return await gasAPI.callWithRetry('submitSaleData', saleData);
-}
-
-async function getTodaysSalesBreakdown() {
-    return await gasAPI.callWithRetry('getTodaysSalesBreakdown');
-}
-
-// Reports
-async function generateReport(params) {
-    return await gasAPI.callWithRetry('generateReport', params);
-}
-
-// User Management
-async function getAllUsers() {
-    return await gasAPI.callWithRetry('getAllUsers');
-}
-
-async function getAllUsernames() {
-    return await gasAPI.callWithRetry('getAllUsernames');
-}
-
-async function addUser(userData, currentUser) {
-    return await gasAPI.callWithRetry('addUser', { ...userData, currentUser });
-}
-
-async function deleteUser(username, currentUser) {
-    return await gasAPI.callWithRetry('deleteUser', { username, currentUser });
-}
-
-/**
- * GOOGLE APPS SCRIPT MOCK
- * This replaces the google.script.run object for GitHub Pages
- */
+// Mock google.script.run for compatibility
 window.google = window.google || {};
 window.google.script = window.google.script || {};
 window.google.script.run = {
@@ -311,153 +95,143 @@ window.google.script.run = {
         return this;
     },
     
-    // Login
+    // Authentication
     login(username, password) {
-        login(username, password)
+        gasAPI.callWithRetry('login', { username, password })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
+    changePassword(currentUser, targetUser, newPassword, oldPassword, isManager) {
+        gasAPI.callWithRetry('changePassword', { currentUser, targetUser, newPassword, oldPassword, isManager })
+            .then(this.successCallback)
+            .catch(this.failureCallback);
+        return this;
+    },
+
     // Inventory
     getInventoryData() {
-        getInventoryData()
+        gasAPI.callWithRetry('getInventoryData')
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     addInventoryItem(itemData, username) {
-        addInventoryItem(itemData, username)
+        gasAPI.callWithRetry('addInventoryItem', { ...itemData, username })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     updateInventoryItem(itemData, username) {
-        updateInventoryItem(itemData, username)
+        gasAPI.callWithRetry('updateInventoryItem', { ...itemData, username })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     deleteInventoryItem(itemName, username) {
-        deleteInventoryItem(itemName, username)
+        gasAPI.callWithRetry('deleteInventoryItem', { itemName, username })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     bulkUploadInventory(items, username) {
-        bulkUploadInventory(items, username)
+        gasAPI.callWithRetry('bulkUploadInventory', { items, username })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     // Sales
     submitSaleData(saleData) {
-        submitSaleData(saleData)
+        gasAPI.callWithRetry('submitSaleData', saleData)
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     getTodaysSalesBreakdown() {
-        getTodaysSalesBreakdown()
+        gasAPI.callWithRetry('getTodaysSalesBreakdown')
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     // Reports
     generateReport(params) {
-        generateReport(params)
+        gasAPI.callWithRetry('generateReport', params)
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     // Users
     getAllUsers() {
-        getAllUsers()
+        gasAPI.callWithRetry('getAllUsers')
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     getAllUsernames() {
-        getAllUsernames()
+        gasAPI.callWithRetry('getAllUsernames')
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     addUser(userData, currentUser) {
-        addUser(userData, currentUser)
+        gasAPI.callWithRetry('addUser', { ...userData, currentUser })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
-    
+
     deleteUser(username, currentUser) {
-        deleteUser(username, currentUser)
-            .then(this.successCallback)
-            .catch(this.failureCallback);
-        return this;
-    },
-    
-    changePassword(currentUser, targetUser, newPassword, oldPassword, isManager) {
-        changePassword(currentUser, targetUser, newPassword, oldPassword, isManager)
+        gasAPI.callWithRetry('deleteUser', { username, currentUser })
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     }
 };
 
-/**
- * CONNECTION TESTER
- * Tests the connection when the page loads
- */
-async function testGASConnection() {
-    console.log('🔍 Testing connection to GAS backend...');
-    
-    const testResult = await gasAPI.testConnection();
-    
-    if (testResult.connected) {
-        console.log('✅ GAS Connection: SUCCESS');
-        return true;
-    } else {
-        console.error('❌ GAS Connection: FAILED -', testResult.message);
-        
-        // Show connection warning
-        if (!document.getElementById('connection-warning')) {
-            const warning = document.createElement('div');
-            warning.id = 'connection-warning';
-            warning.className = 'alert bg-error';
-            warning.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <span>
-                        <i class="fas fa-wifi"></i> 
-                        Cannot connect to server: ${testResult.message}
-                    </span>
-                    <button onclick="this.parentElement.parentElement.remove()" 
-                            style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">
-                        ×
-                    </button>
-                </div>
-            `;
-            document.body.appendChild(warning);
-        }
-        
-        return false;
-    }
-}
-
-// Test connection when page loads
+// Test connection
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(testGASConnection, 1000);
+    setTimeout(async () => {
+        try {
+            console.log('🔍 Testing GAS connection...');
+            const result = await gasAPI.callGASFunction('testConnection', {});
+            console.log('✅ GAS Connection successful:', result);
+        } catch (error) {
+            console.error('❌ GAS Connection failed:', error.message);
+            
+            // Show helpful error message
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = `
+                position: fixed;
+                top: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #ef4444;
+                color: white;
+                padding: 15px;
+                border-radius: 5px;
+                z-index: 10000;
+                max-width: 500px;
+                text-align: center;
+                font-family: Arial, sans-serif;
+            `;
+            errorDiv.innerHTML = `
+                <strong>Connection Error:</strong> ${error.message}
+                <br><small>Please check your GAS deployment settings</small>
+            `;
+            document.body.appendChild(errorDiv);
+        }
+    }, 1000);
 });
 
-console.log('🚀 SmartStore 360 API Connector loaded successfully!');
-console.log('📝 Remember to update GAS_WEB_APP_URL with your actual Google Apps Script URL');
+console.log('🚀 SmartStore 360 API Connector Loaded with your GAS URL');
