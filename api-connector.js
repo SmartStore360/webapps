@@ -1,5 +1,5 @@
-// SIMPLE WORKING API CONNECTOR
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzHuHzK0H0OI0LrwAYY7taRKBw5d7Q76Vzr0v7FY37RwssszhkeCYMYRRfijMci5iym9Q/exec'; // ⬅️ REPLACE WITH NEW URL
+// SMARTSTORE 360 API CONNECTOR - UPDATED
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzHuHzK0H0OI0LrwAYY7taRKBw5d7Q76Vzr0v7FY37RwssszhkeCYMYRRfijMci5iym9Q/exec';
 
 function callGAS(functionName, data = {}) {
     return new Promise((resolve, reject) => {
@@ -8,6 +8,7 @@ function callGAS(functionName, data = {}) {
         window[callbackName] = function(response) {
             delete window[callbackName];
             if (script.parentNode) script.parentNode.removeChild(script);
+            console.log('✅ GAS Response:', response);
             resolve(response);
         };
 
@@ -19,11 +20,15 @@ function callGAS(functionName, data = {}) {
         }
 
         const script = document.createElement('script');
-        script.src = `${GAS_WEB_APP_URL}?${params.toString()}`;
+        const fullUrl = `${GAS_WEB_APP_URL}?${params.toString()}`;
+        console.log('🔗 Calling GAS URL:', fullUrl);
+        script.src = fullUrl;
+        
         script.onerror = function() {
             delete window[callbackName];
             if (script.parentNode) script.parentNode.removeChild(script);
-            reject(new Error(`Failed to load GAS script. Check deployment.`));
+            console.error('❌ Script load failed');
+            reject(new Error(`Failed to connect to Google Apps Script`));
         };
 
         document.head.appendChild(script);
@@ -106,33 +111,39 @@ window.google.script.run = {
 };
 
 // Test connection on load
-setTimeout(() => {
-    const status = document.createElement('div');
-    status.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #3b82f6;
-        color: white;
-        padding: 15px 25px;
-        border-radius: 8px;
-        z-index: 10000;
-        font-family: Arial, sans-serif;
-        text-align: center;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    `;
-    status.innerHTML = '🔄 Testing GAS Connection...';
-    document.body.appendChild(status);
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        const status = document.createElement('div');
+        status.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #3b82f6;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            max-width: 90%;
+        `;
+        status.innerHTML = '🔄 Testing Connection to Google Apps Script...';
+        document.body.appendChild(status);
 
-    callGAS('testConnection')
-        .then(result => {
-            status.style.background = '#10b981';
-            status.innerHTML = '✅ Connected to GAS!';
-            setTimeout(() => status.remove(), 4000);
-        })
-        .catch(error => {
-            status.style.background = '#ef4444';
-            status.innerHTML = `❌ Connection Failed<br><small>${error.message}</small>`;
-        });
-}, 1000);
+        console.log('🔍 Testing GAS connection...');
+        callGAS('testConnection')
+            .then(result => {
+                status.style.background = '#10b981';
+                status.innerHTML = '✅ Connected Successfully!<br><small>You can now login with admin/admin</small>';
+                console.log('✅ GAS Connection successful:', result);
+                setTimeout(() => status.remove(), 5000);
+            })
+            .catch(error => {
+                status.style.background = '#ef4444';
+                status.innerHTML = `❌ Connection Failed<br><small>${error.message}</small><br><small>Check GAS deployment settings</small>`;
+                console.error('❌ GAS Connection failed:', error);
+            });
+    }, 1000);
+});
