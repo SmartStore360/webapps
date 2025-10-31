@@ -1,106 +1,122 @@
 /**
  * SmartStore 360 - GAS API Connector
- * Complete connection handler for Google Apps Script backend
+ * Fixed Version - Using Fetch API Only
  */
 
 class GASConnector {
     constructor() {
+        // USE YOUR ACTUAL SCRIPT ID - Replace this!
         this.baseUrl = 'https://script.google.com/macros/s/AKfycbzHuHzK0H0OI0LrwAYY7taRKBw5d7Q76Vzr0v7FY37RwssszhkeCYMYRRfijMci5iym9Q/exec';
         this.isConnected = false;
         this.retryCount = 0;
         this.maxRetries = 3;
-        
-        // Initialize connection
-        this.init();
     }
-
-    init() {
-        console.log('🔌 GAS Connector Initializing...');
-        this.setupErrorHandling();
-    }
-
-    setupErrorHandling() {
-        window.addEventListener('online', () => {
-            console.log('🌐 Internet connection restored');
-            this.testConnection();
-        });
-
-        window.addEventListener('offline', () => {
-            console.warn('⚠️ Internet connection lost');
-            this.isConnected = false;
-        });
-    }
-
-    /// In your api-connector.js, update the testConnection method:
-async testConnection() {
-    console.log('🔍 Testing GAS connection...');
-    
-    try {
-        const url = `${this.baseUrl}?action=test&timestamp=${Date.now()}`;
-        console.log('🔗 Calling GAS URL:', url);
-
-        const response = await this.makeRequest(url);
-        
-        this.isConnected = true;
-        this.retryCount = 0;
-        
-        console.log('✅ GAS Connection successful:', response);
-        this.onConnectionSuccess(response);
-        
-        return response;
-        
-    } catch (error) {
-        // ... error handling remains the same
-    }
-}
 
     /**
-     * Generic request handler
+     * Test connection to GAS backend - FIXED VERSION
      */
-    async makeRequest(url, options = {}) {
-        const defaultOptions = {
-            method: 'GET',
-            mode: 'cors',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-            },
-            timeout: 10000
-        };
-
-        const mergedOptions = { ...defaultOptions, ...options };
+    async testConnection() {
+        console.log('🔍 Testing GAS connection...');
         
-        // Add timestamp to avoid caching
-        const finalUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), mergedOptions.timeout);
-        mergedOptions.signal = controller.signal;
-
         try {
-            const response = await fetch(finalUrl, mergedOptions);
-            clearTimeout(timeoutId);
+            const url = `${this.baseUrl}?action=test&timestamp=${Date.now()}`;
+            console.log('🔗 Calling GAS URL:', url);
+
+            // Use simple fetch without complex options that trigger preflight
+            const response = await fetch(url, {
+                method: 'GET',
+                // Remove 'mode: cors' and let browser handle it
+                // Remove custom headers to avoid preflight
+            });
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const text = await response.text();
+            let data;
             
-            // Try to parse as JSON, fallback to text
             try {
-                return JSON.parse(text);
-            } catch {
-                return text;
+                data = JSON.parse(text);
+            } catch (e) {
+                data = { rawResponse: text };
             }
+
+            this.isConnected = true;
+            this.retryCount = 0;
+            
+            console.log('✅ GAS Connection successful:', data);
+            this.onConnectionSuccess(data);
+            
+            return data;
             
         } catch (error) {
-            clearTimeout(timeoutId);
+            this.isConnected = false;
+            this.retryCount++;
             
-            if (error.name === 'AbortError') {
-                throw new Error('Request timeout - GAS backend not responding');
+            console.error('❌ GAS Connection failed:', error);
+            this.onConnectionError(error);
+            
+            // Auto-retry with exponential backoff
+            if (this.retryCount <= this.maxRetries) {
+                const delay = Math.pow(2, this.retryCount) * 1000;
+                console.log(`🔄 Retrying in ${delay}ms... (Attempt ${this.retryCount})`);
+                
+                setTimeout(() => this.testConnection(), delay);
             }
             
+            throw error;
+        }
+    }
+
+    /**
+     * Simple GET request - No preflight triggers
+     */
+    async get(endpoint, params = {}) {
+        const queryString = new URLSearchParams(params).toString();
+        const url = `${this.baseUrl}?action=${endpoint}&${queryString}&t=${Date.now()}`;
+        
+        try {
+            const response = await fetch(url);
+            const text = await response.text();
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${text}`);
+            }
+            
+            return JSON.parse(text);
+        } catch (error) {
+            console.error(`❌ GET ${endpoint} failed:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Simple POST request - Using URL params instead of body to avoid preflight
+     */
+    async post(endpoint, data = {}) {
+        const queryString = new URLSearchParams({
+            action: endpoint,
+            ...data,
+            t: Date.now()
+        }).toString();
+        
+        const url = `${this.baseUrl}?${queryString}`;
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST'
+            });
+            
+            const text = await response.text();
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${text}`);
+            }
+            
+            return JSON.parse(text);
+        } catch (error) {
+            console.error(`❌ POST ${endpoint} failed:`, error);
             throw error;
         }
     }
@@ -109,171 +125,83 @@ async testConnection() {
      * PRODUCT MANAGEMENT
      */
     async getProducts(category = 'all') {
-        try {
-            const url = `${this.baseUrl}?action=getProducts&category=${encodeURIComponent(category)}`;
-            return await this.makeRequest(url);
-        } catch (error) {
-            console.error('❌ Failed to fetch products:', error);
-            throw error;
-        }
+        return this.get('getProducts', { category });
     }
 
     async addProduct(productData) {
-        try {
-            const url = `${this.baseUrl}?action=addProduct`;
-            return await this.makeRequest(url, {
-                method: 'POST',
-                body: JSON.stringify(productData)
-            });
-        } catch (error) {
-            console.error('❌ Failed to add product:', error);
-            throw error;
-        }
+        return this.post('addProduct', productData);
     }
 
     async updateProduct(productId, productData) {
-        try {
-            const url = `${this.baseUrl}?action=updateProduct&id=${encodeURIComponent(productId)}`;
-            return await this.makeRequest(url, {
-                method: 'POST',
-                body: JSON.stringify(productData)
-            });
-        } catch (error) {
-            console.error('❌ Failed to update product:', error);
-            throw error;
-        }
+        return this.post('updateProduct', { id: productId, ...productData });
     }
 
     async deleteProduct(productId) {
-        try {
-            const url = `${this.baseUrl}?action=deleteProduct&id=${encodeURIComponent(productId)}`;
-            return await this.makeRequest(url, {
-                method: 'POST'
-            });
-        } catch (error) {
-            console.error('❌ Failed to delete product:', error);
-            throw error;
-        }
+        return this.post('deleteProduct', { id: productId });
     }
 
     /**
      * ORDER MANAGEMENT
      */
     async getOrders(status = 'all') {
-        try {
-            const url = `${this.baseUrl}?action=getOrders&status=${encodeURIComponent(status)}`;
-            return await this.makeRequest(url);
-        } catch (error) {
-            console.error('❌ Failed to fetch orders:', error);
-            throw error;
-        }
+        return this.get('getOrders', { status });
     }
 
     async createOrder(orderData) {
-        try {
-            const url = `${this.baseUrl}?action=createOrder`;
-            return await this.makeRequest(url, {
-                method: 'POST',
-                body: JSON.stringify(orderData)
-            });
-        } catch (error) {
-            console.error('❌ Failed to create order:', error);
-            throw error;
-        }
+        return this.post('createOrder', orderData);
     }
 
     async updateOrderStatus(orderId, status) {
-        try {
-            const url = `${this.baseUrl}?action=updateOrderStatus&id=${encodeURIComponent(orderId)}&status=${encodeURIComponent(status)}`;
-            return await this.makeRequest(url, {
-                method: 'POST'
-            });
-        } catch (error) {
-            console.error('❌ Failed to update order status:', error);
-            throw error;
-        }
+        return this.post('updateOrderStatus', { id: orderId, status });
     }
 
     /**
      * INVENTORY MANAGEMENT
      */
     async getInventory() {
-        try {
-            const url = `${this.baseUrl}?action=getInventory`;
-            return await this.makeRequest(url);
-        } catch (error) {
-            console.error('❌ Failed to fetch inventory:', error);
-            throw error;
-        }
+        return this.get('getInventory');
     }
 
     async updateStock(productId, newQuantity) {
-        try {
-            const url = `${this.baseUrl}?action=updateStock&id=${encodeURIComponent(productId)}&quantity=${newQuantity}`;
-            return await this.makeRequest(url, {
-                method: 'POST'
-            });
-        } catch (error) {
-            console.error('❌ Failed to update stock:', error);
-            throw error;
-        }
+        return this.post('updateStock', { id: productId, quantity: newQuantity });
     }
 
     /**
      * ANALYTICS & REPORTS
      */
     async getSalesReport(startDate, endDate) {
-        try {
-            const url = `${this.baseUrl}?action=getSalesReport&start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`;
-            return await this.makeRequest(url);
-        } catch (error) {
-            console.error('❌ Failed to fetch sales report:', error);
-            throw error;
-        }
+        return this.get('getSalesReport', { start: startDate, end: endDate });
     }
 
     async getDashboardData() {
-        try {
-            const url = `${this.baseUrl}?action=getDashboardData`;
-            return await this.makeRequest(url);
-        } catch (error) {
-            console.error('❌ Failed to fetch dashboard data:', error);
-            throw error;
-        }
+        return this.get('getDashboardData');
     }
 
     /**
      * Event handlers
      */
     onConnectionSuccess(response) {
-        // Dispatch custom event for other components to listen to
         const event = new CustomEvent('gas-connected', { 
             detail: { response, timestamp: new Date() }
         });
         window.dispatchEvent(event);
         
-        // Update UI state if needed
         if (window.updateConnectionStatus) {
             window.updateConnectionStatus(true);
         }
     }
 
     onConnectionError(error) {
-        // Dispatch custom event for connection errors
         const event = new CustomEvent('gas-error', { 
             detail: { error, timestamp: new Date() }
         });
         window.dispatchEvent(event);
         
-        // Update UI state if needed
         if (window.updateConnectionStatus) {
             window.updateConnectionStatus(false);
         }
     }
 
-    /**
-     * Utility methods
-     */
     getConnectionStatus() {
         return {
             isConnected: this.isConnected,
@@ -291,8 +219,3 @@ async testConnection() {
 
 // Create global instance
 const gasAPI = new GASConnector();
-
-// Export for module systems
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { GASConnector, gasAPI };
-}
