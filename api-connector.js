@@ -147,3 +147,44 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }, 1000);
 });
+// Backend Service Module
+const BackendService = {
+  baseUrl: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec',
+  
+  async testConnection() {
+    try {
+      const timestamp = new Date().getTime();
+      const url = `${this.baseUrl}?t=${timestamp}`; // Avoid cache
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('🎉 Backend connection successful!', data);
+      return data;
+    } catch (error) {
+      console.error('💥 Backend connection failed:', error);
+      return null;
+    }
+  }
+};
+
+// Test the connection when app starts
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('🚀 SmartStore 360 App Initializing...');
+  
+  // Test backend connection after a short delay
+  setTimeout(() => {
+    BackendService.testConnection();
+  }, 1000);
+  
+  console.log('✅ SmartStore 360 App Ready!');
+});
