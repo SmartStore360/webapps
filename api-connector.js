@@ -1,6 +1,7 @@
 /**
  * SmartStore 360 - GAS API Connector
  * JSONP Version - WORKING SOLUTION
+ * COPY AND REPLACE YOUR ENTIRE api-connector.js WITH THIS
  */
 
 class GASConnector {
@@ -10,7 +11,7 @@ class GASConnector {
         this.callbacks = new Map();
         this.callbackId = 0;
         
-        console.log('🔌 GAS Connector Initialized with JSONP');
+        console.log('🔌 GAS JSONP Connector Initialized');
     }
 
     /**
@@ -20,14 +21,21 @@ class GASConnector {
         return new Promise((resolve, reject) => {
             const callbackName = 'gas_jsonp_' + Date.now() + '_' + this.callbackId++;
             
+            console.log('🔄 JSONP Request with callback:', callbackName);
+            
             // Store the callback
             this.callbacks.set(callbackName, { resolve, reject });
             
             // Create global callback function
             window[callbackName] = (response) => {
-                console.log('📨 JSONP Response received:', response);
+                console.log('📨 JSONP Response received for', callbackName, response);
                 this.cleanupJsonp(callbackName);
-                resolve(response);
+                
+                if (response && response.status === 'success') {
+                    resolve(response);
+                } else {
+                    reject(new Error(response?.message || 'JSONP response error'));
+                }
             };
             
             // Build URL with callback parameter
@@ -38,32 +46,38 @@ class GASConnector {
             });
             
             const url = `${this.baseUrl}?${urlParams.toString()}`;
-            console.log('🔗 JSONP Calling:', url);
+            console.log('🔗 JSONP Calling URL:', url);
             
             // Create and inject script tag
             const script = document.createElement('script');
             script.src = url;
+            
             script.onerror = (error) => {
                 console.error('❌ JSONP Script failed to load:', error);
                 this.cleanupJsonp(callbackName);
-                reject(new Error('Failed to load GAS script'));
+                reject(new Error('Failed to load GAS script - Check if GAS is deployed correctly'));
             };
             
             // Set timeout for JSONP request
             const timeoutId = setTimeout(() => {
+                console.error('⏰ JSONP Timeout for callback:', callbackName);
                 this.cleanupJsonp(callbackName);
-                reject(new Error('JSONP request timeout'));
-            }, 10000);
+                reject(new Error('JSONP request timeout - GAS not responding'));
+            }, 15000);
             
             // Store timeout ID for cleanup
             this.callbacks.get(callbackName).timeoutId = timeoutId;
             
-            // Inject script
+            // Inject script - THIS TRIGGERS THE REQUEST
+            console.log('📤 Injecting script tag for JSONP...');
             document.head.appendChild(script);
+            
         });
     }
 
     cleanupJsonp(callbackName) {
+        console.log('🧹 Cleaning up JSONP callback:', callbackName);
+        
         // Clear timeout
         const callbackInfo = this.callbacks.get(callbackName);
         if (callbackInfo && callbackInfo.timeoutId) {
@@ -75,10 +89,13 @@ class GASConnector {
         this.callbacks.delete(callbackName);
         
         // Remove script tags (cleanup)
-        const scripts = document.querySelectorAll(`script[src*="callback=${callbackName}"]`);
+        const scripts = document.querySelectorAll('script');
         scripts.forEach(script => {
-            if (script.parentNode) {
-                script.parentNode.removeChild(script);
+            if (script.src.includes('callback=' + callbackName)) {
+                if (script.parentNode) {
+                    script.parentNode.removeChild(script);
+                    console.log('🗑️ Removed script tag for:', callbackName);
+                }
             }
         });
     }
