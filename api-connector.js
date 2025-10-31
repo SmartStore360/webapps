@@ -1,6 +1,6 @@
 // API Connector with JSONP for CORS, error handling, retries (3 tries)
 
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'; // Replace with your GAS URL
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzL2NyV1GfvRqBYeFB0DI-0IjrsRZiULNVRNXShR7k3xTPF4B1WOzFKc15C6VSIRY8Reg/exec'; // Replace with your GAS URL
 
 function callGAS(functionName, data = {}, successCallback, errorCallback, retryCount = 3) {
   const callbackName = 'callback' + Date.now();
@@ -42,3 +42,4 @@ function callGAS(functionName, data = {}, successCallback, errorCallback, retryC
 
   document.body.appendChild(script);
 }
+
