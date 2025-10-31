@@ -94,3 +94,18 @@ function getCurrentUser() {
   const userStr = localStorage.getItem('currentUser');
   return userStr ? JSON.parse(userStr) : null;
 }
+// Test function - call this after login
+function testConnection() {
+  callGAS(
+    'getInventoryData',
+    {},
+    (response) => {
+      console.log('Test successful! Inventory data:', response);
+      alert('Connection working! Loaded ' + response.length + ' items');
+    },
+    (error) => {
+      console.error('Test failed:', error);
+      alert('Test failed: ' + error.message);
+    }
+  );
+}
