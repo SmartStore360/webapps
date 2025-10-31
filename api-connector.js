@@ -8,21 +8,24 @@ function callGAS(functionName, data = {}, successCallback, errorCallback, retryC
   const requestData = {...data};
   requestData.functionName = functionName;
   
-  // Add token to all requests except login and public functions
-  const publicFunctions = ['login', 'getAllUsernames', 'getAllUsers', 'getInventoryData', 'getInventoryMap'];
+  // TEMPORARY: Make almost all functions public for testing
+  // Only require token for functions that modify data
+  const privateFunctions = ['addUser', 'deleteUser', 'addInventoryItem', 'updateInventoryItem', 
+                           'deleteInventoryItem', 'bulkUploadInventory', 'submitSaleData', 
+                           'deleteLastSale', 'deleteSale', 'changePassword'];
   
-  if (!publicFunctions.includes(functionName)) {
+  if (privateFunctions.includes(functionName)) {
     const token = localStorage.getItem('authToken');
     if (token) {
       requestData.token = token;
     } else {
-      // For non-public functions without token, call error callback but don't throw
       if (errorCallback) {
         errorCallback(new Error('No authentication token found. Please login again.'));
       }
       return;
     }
   }
+  // For all other functions, don't require token (TEMPORARY)
   
   const params = new URLSearchParams();
   Object.keys(requestData).forEach(key => {
@@ -55,12 +58,6 @@ function callGAS(functionName, data = {}, successCallback, errorCallback, retryC
     if (response && response.success) {
       if (successCallback) successCallback(response);
     } else {
-      // If token is invalid, clear it and redirect to login
-      if (response && response.message === 'Invalid token') {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('currentUser');
-        window.location.href = 'login.html';
-      }
       if (errorCallback) errorCallback(new Error(response ? response.message : 'Unknown error'));
     }
   };
