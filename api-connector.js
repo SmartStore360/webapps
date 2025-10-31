@@ -8,20 +8,27 @@ function callGAS(functionName, data = {}, successCallback, errorCallback, retryC
   const requestData = {...data};
   requestData.functionName = functionName;
   
-  // Add token to all requests except login
-  if (functionName !== 'login') {
+  // Add token to all requests except login and public functions
+  const publicFunctions = ['login', 'getAllUsernames', 'getAllUsers', 'getInventoryData', 'getInventoryMap'];
+  
+  if (!publicFunctions.includes(functionName)) {
     const token = localStorage.getItem('authToken');
     if (token) {
       requestData.token = token;
     } else {
-      errorCallback(new Error('No authentication token found. Please login again.'));
+      // For non-public functions without token, call error callback but don't throw
+      if (errorCallback) {
+        errorCallback(new Error('No authentication token found. Please login again.'));
+      }
       return;
     }
   }
   
   const params = new URLSearchParams();
   Object.keys(requestData).forEach(key => {
-    params.append(key, requestData[key]);
+    // Stringify objects for proper transmission
+    const value = typeof requestData[key] === 'object' ? JSON.stringify(requestData[key]) : requestData[key];
+    params.append(key, value);
   });
   params.append('callback', callbackName);
   
@@ -29,28 +36,32 @@ function callGAS(functionName, data = {}, successCallback, errorCallback, retryC
   script.src = `${GAS_WEB_APP_URL}?${params.toString()}`;
   
   const timeout = setTimeout(() => {
-    document.body.removeChild(script);
+    if (script.parentNode) {
+      document.body.removeChild(script);
+    }
     if (retryCount > 1) {
       callGAS(functionName, data, successCallback, errorCallback, retryCount - 1);
-    } else {
+    } else if (errorCallback) {
       errorCallback(new Error('Request timed out'));
     }
   }, 10000);
 
   window[callbackName] = (response) => {
     clearTimeout(timeout);
-    document.body.removeChild(script);
+    if (script.parentNode) {
+      document.body.removeChild(script);
+    }
     delete window[callbackName];
-    if (response.success) {
-      successCallback(response);
+    if (response && response.success) {
+      if (successCallback) successCallback(response);
     } else {
       // If token is invalid, clear it and redirect to login
-      if (response.message === 'Invalid token') {
+      if (response && response.message === 'Invalid token') {
         localStorage.removeItem('authToken');
         localStorage.removeItem('currentUser');
-        window.location.href = '/login.html'; // Adjust to your login page
+        window.location.href = 'login.html';
       }
-      errorCallback(new Error(response.message || 'Unknown error'));
+      if (errorCallback) errorCallback(new Error(response ? response.message : 'Unknown error'));
     }
   };
 
@@ -59,53 +70,10 @@ function callGAS(functionName, data = {}, successCallback, errorCallback, retryC
     delete window[callbackName];
     if (retryCount > 1) {
       callGAS(functionName, data, successCallback, errorCallback, retryCount - 1);
-    } else {
+    } else if (errorCallback) {
       errorCallback(new Error('Network error'));
     }
   };
 
   document.body.appendChild(script);
-}
-
-// Helper function to store login data
-function storeLoginData(loginResult) {
-  if (loginResult.success && loginResult.token) {
-    localStorage.setItem('authToken', loginResult.token);
-    localStorage.setItem('currentUser', JSON.stringify(loginResult.user));
-    return true;
-  }
-  return false;
-}
-
-// Helper function to check if user is logged in
-function isLoggedIn() {
-  return localStorage.getItem('authToken') !== null;
-}
-
-// Helper function to logout
-function logout() {
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('currentUser');
-  window.location.href = '/login.html'; // Adjust to your login page
-}
-
-// Helper function to get current user
-function getCurrentUser() {
-  const userStr = localStorage.getItem('currentUser');
-  return userStr ? JSON.parse(userStr) : null;
-}
-// Test function - call this after login
-function testConnection() {
-  callGAS(
-    'getInventoryData',
-    {},
-    (response) => {
-      console.log('Test successful! Inventory data:', response);
-      alert('Connection working! Loaded ' + response.length + ' items');
-    },
-    (error) => {
-      console.error('Test failed:', error);
-      alert('Test failed: ' + error.message);
-    }
-  );
 }
