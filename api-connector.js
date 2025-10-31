@@ -1,122 +1,81 @@
 /**
  * SmartStore 360 - GAS API Connector
- * Fixed Version - Using Fetch API Only
+ * JSONP Version - Bypasses CORS completely
  */
 
 class GASConnector {
     constructor() {
-        // USE YOUR ACTUAL SCRIPT ID - Replace this!
         this.baseUrl = 'https://script.google.com/macros/s/AKfycbzHuHzK0H0OI0LrwAYY7taRKBw5d7Q76Vzr0v7FY37RwssszhkeCYMYRRfijMci5iym9Q/exec';
         this.isConnected = false;
-        this.retryCount = 0;
-        this.maxRetries = 3;
+        this.callbacks = new Map();
+        this.callbackId = 0;
     }
 
     /**
-     * Test connection to GAS backend - FIXED VERSION
+     * JSONP Request - Bypasses CORS
+     */
+    jsonpRequest(params) {
+        return new Promise((resolve, reject) => {
+            const callbackName = 'gas_callback_' + this.callbackId++;
+            
+            this.callbacks.set(callbackName, { resolve, reject });
+            
+            // Add callback to window
+            window[callbackName] = (response) => {
+                this.cleanupJsonp(callbackName);
+                resolve(response);
+            };
+            
+            // Create script tag
+            const script = document.createElement('script');
+            const urlParams = new URLSearchParams({
+                ...params,
+                callback: callbackName
+            });
+            
+            script.src = `${this.baseUrl}?${urlParams.toString()}`;
+            script.onerror = () => {
+                this.cleanupJsonp(callbackName);
+                reject(new Error('JSONP request failed'));
+            };
+            
+            document.head.appendChild(script);
+        });
+    }
+
+    cleanupJsonp(callbackName) {
+        delete window[callbackName];
+        this.callbacks.delete(callbackName);
+        
+        // Remove any script tags we created
+        const scripts = document.head.getElementsByTagName('script');
+        for (let script of scripts) {
+            if (script.src.includes('callback=' + callbackName)) {
+                document.head.removeChild(script);
+                break;
+            }
+        }
+    }
+
+    /**
+     * Test connection using JSONP
      */
     async testConnection() {
-        console.log('🔍 Testing GAS connection...');
+        console.log('🔍 Testing GAS connection with JSONP...');
         
         try {
-            const url = `${this.baseUrl}?action=test&timestamp=${Date.now()}`;
-            console.log('🔗 Calling GAS URL:', url);
-
-            // Use simple fetch without complex options that trigger preflight
-            const response = await fetch(url, {
-                method: 'GET',
-                // Remove 'mode: cors' and let browser handle it
-                // Remove custom headers to avoid preflight
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const text = await response.text();
-            let data;
+            const response = await this.jsonpRequest({ action: 'test' });
             
-            try {
-                data = JSON.parse(text);
-            } catch (e) {
-                data = { rawResponse: text };
-            }
-
             this.isConnected = true;
-            this.retryCount = 0;
+            console.log('✅ GAS Connection successful:', response);
+            this.onConnectionSuccess(response);
             
-            console.log('✅ GAS Connection successful:', data);
-            this.onConnectionSuccess(data);
-            
-            return data;
+            return response;
             
         } catch (error) {
             this.isConnected = false;
-            this.retryCount++;
-            
             console.error('❌ GAS Connection failed:', error);
             this.onConnectionError(error);
-            
-            // Auto-retry with exponential backoff
-            if (this.retryCount <= this.maxRetries) {
-                const delay = Math.pow(2, this.retryCount) * 1000;
-                console.log(`🔄 Retrying in ${delay}ms... (Attempt ${this.retryCount})`);
-                
-                setTimeout(() => this.testConnection(), delay);
-            }
-            
-            throw error;
-        }
-    }
-
-    /**
-     * Simple GET request - No preflight triggers
-     */
-    async get(endpoint, params = {}) {
-        const queryString = new URLSearchParams(params).toString();
-        const url = `${this.baseUrl}?action=${endpoint}&${queryString}&t=${Date.now()}`;
-        
-        try {
-            const response = await fetch(url);
-            const text = await response.text();
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${text}`);
-            }
-            
-            return JSON.parse(text);
-        } catch (error) {
-            console.error(`❌ GET ${endpoint} failed:`, error);
-            throw error;
-        }
-    }
-
-    /**
-     * Simple POST request - Using URL params instead of body to avoid preflight
-     */
-    async post(endpoint, data = {}) {
-        const queryString = new URLSearchParams({
-            action: endpoint,
-            ...data,
-            t: Date.now()
-        }).toString();
-        
-        const url = `${this.baseUrl}?${queryString}`;
-        
-        try {
-            const response = await fetch(url, {
-                method: 'POST'
-            });
-            
-            const text = await response.text();
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${text}`);
-            }
-            
-            return JSON.parse(text);
-        } catch (error) {
-            console.error(`❌ POST ${endpoint} failed:`, error);
             throw error;
         }
     }
@@ -125,56 +84,76 @@ class GASConnector {
      * PRODUCT MANAGEMENT
      */
     async getProducts(category = 'all') {
-        return this.get('getProducts', { category });
+        return this.jsonpRequest({ action: 'getProducts', category });
     }
 
     async addProduct(productData) {
-        return this.post('addProduct', productData);
+        // For POST-like actions with JSONP, we send data as URL parameters
+        const params = { action: 'addProduct', ...productData };
+        return this.jsonpRequest(params);
     }
 
     async updateProduct(productId, productData) {
-        return this.post('updateProduct', { id: productId, ...productData });
+        const params = { 
+            action: 'updateProduct', 
+            id: productId,
+            ...productData 
+        };
+        return this.jsonpRequest(params);
     }
 
     async deleteProduct(productId) {
-        return this.post('deleteProduct', { id: productId });
+        return this.jsonpRequest({ action: 'deleteProduct', id: productId });
     }
 
     /**
      * ORDER MANAGEMENT
      */
     async getOrders(status = 'all') {
-        return this.get('getOrders', { status });
+        return this.jsonpRequest({ action: 'getOrders', status });
     }
 
     async createOrder(orderData) {
-        return this.post('createOrder', orderData);
+        const params = { action: 'createOrder', ...orderData };
+        return this.jsonpRequest(params);
     }
 
     async updateOrderStatus(orderId, status) {
-        return this.post('updateOrderStatus', { id: orderId, status });
+        return this.jsonpRequest({ 
+            action: 'updateOrderStatus', 
+            id: orderId, 
+            status 
+        });
     }
 
     /**
      * INVENTORY MANAGEMENT
      */
     async getInventory() {
-        return this.get('getInventory');
+        return this.jsonpRequest({ action: 'getInventory' });
     }
 
     async updateStock(productId, newQuantity) {
-        return this.post('updateStock', { id: productId, quantity: newQuantity });
+        return this.jsonpRequest({ 
+            action: 'updateStock', 
+            id: productId, 
+            quantity: newQuantity 
+        });
     }
 
     /**
      * ANALYTICS & REPORTS
      */
     async getSalesReport(startDate, endDate) {
-        return this.get('getSalesReport', { start: startDate, end: endDate });
+        return this.jsonpRequest({ 
+            action: 'getSalesReport', 
+            start: startDate, 
+            end: endDate 
+        });
     }
 
     async getDashboardData() {
-        return this.get('getDashboardData');
+        return this.jsonpRequest({ action: 'getDashboardData' });
     }
 
     /**
@@ -185,10 +164,6 @@ class GASConnector {
             detail: { response, timestamp: new Date() }
         });
         window.dispatchEvent(event);
-        
-        if (window.updateConnectionStatus) {
-            window.updateConnectionStatus(true);
-        }
     }
 
     onConnectionError(error) {
@@ -196,24 +171,13 @@ class GASConnector {
             detail: { error, timestamp: new Date() }
         });
         window.dispatchEvent(event);
-        
-        if (window.updateConnectionStatus) {
-            window.updateConnectionStatus(false);
-        }
     }
 
     getConnectionStatus() {
         return {
             isConnected: this.isConnected,
-            retryCount: this.retryCount,
             baseUrl: this.baseUrl
         };
-    }
-
-    resetConnection() {
-        this.retryCount = 0;
-        this.isConnected = false;
-        return this.testConnection();
     }
 }
 
