@@ -2269,3 +2269,65 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
     console.log('✅ SmartStore 360 App Ready!');
 });
+// Initialize and test connection
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 SmartStore 360 App Initializing...');
+    
+    // Test GAS connection
+    gasAPI.testConnection()
+        .then(data => {
+            console.log('🎉 Backend connected successfully!', data);
+            // Load your app data here
+            loadInitialData();
+        })
+        .catch(error => {
+            console.error('💥 Failed to connect to backend:', error);
+            // Show offline mode or retry button
+            showOfflineMode();
+        });
+    
+    console.log('✅ SmartStore 360 App Ready!');
+});
+
+// Listen for connection events
+window.addEventListener('gas-connected', (event) => {
+    console.log('🌐 Backend connection established', event.detail);
+    document.body.classList.add('backend-connected');
+    document.body.classList.remove('backend-offline');
+});
+
+window.addEventListener('gas-error', (event) => {
+    console.error('💥 Backend connection error', event.detail);
+    document.body.classList.add('backend-offline');
+    document.body.classList.remove('backend-connected');
+});
+
+// Example usage functions
+async function loadInitialData() {
+    try {
+        const [products, orders, dashboard] = await Promise.all([
+            gasAPI.getProducts(),
+            gasAPI.getOrders(),
+            gasAPI.getDashboardData()
+        ]);
+        
+        console.log('📦 Initial data loaded:', { products, orders, dashboard });
+        renderDashboard(products, orders, dashboard);
+        
+    } catch (error) {
+        console.error('❌ Failed to load initial data:', error);
+    }
+}
+
+function showOfflineMode() {
+    // Show offline notification
+    const offlineAlert = document.createElement('div');
+    offlineAlert.className = 'offline-alert';
+    offlineAlert.innerHTML = `
+        <div class="alert alert-warning">
+            <strong>Offline Mode:</strong> Some features may be limited. 
+            <button onclick="gasAPI.testConnection()">Retry Connection</button>
+        </div>
+    `;
+    document.body.prepend(offlineAlert);
+}
