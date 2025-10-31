@@ -2242,3 +2242,15 @@ document.addEventListener('DOMContentLoaded', function() {
         loginManager.initializeApp(state.currentUser);
     }
 });
+// Debug function - add this to your app
+function debugAuth() {
+  console.log('=== AUTH DEBUG INFO ===');
+  console.log('Token in localStorage:', localStorage.getItem('authToken'));
+  console.log('User in localStorage:', localStorage.getItem('currentUser'));
+  console.log('Current URL:', window.location.href);
+  console.log('Is login page:', window.location.pathname.includes('login.html'));
+  console.log('========================');
+}
+
+// Call this at the start of your app
+debugAuth();
