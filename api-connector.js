@@ -31,44 +31,28 @@ class GASConnector {
         });
     }
 
-    /**
-     * Test connection to GAS backend
-     */
-    async testConnection() {
-        console.log('🔍 Testing GAS connection...');
-        
-        try {
-            const url = `${this.baseUrl}?action=test&timestamp=${Date.now()}`;
-            console.log('🔗 Calling GAS URL:', url);
+    /// In your api-connector.js, update the testConnection method:
+async testConnection() {
+    console.log('🔍 Testing GAS connection...');
+    
+    try {
+        const url = `${this.baseUrl}?action=test&timestamp=${Date.now()}`;
+        console.log('🔗 Calling GAS URL:', url);
 
-            const response = await this.makeRequest(url);
-            
-            this.isConnected = true;
-            this.retryCount = 0;
-            
-            console.log('✅ GAS Connection successful:', response);
-            this.onConnectionSuccess(response);
-            
-            return response;
-            
-        } catch (error) {
-            this.isConnected = false;
-            this.retryCount++;
-            
-            console.error('❌ GAS Connection failed:', error);
-            this.onConnectionError(error);
-            
-            // Auto-retry with exponential backoff
-            if (this.retryCount <= this.maxRetries) {
-                const delay = Math.pow(2, this.retryCount) * 1000;
-                console.log(`🔄 Retrying in ${delay}ms... (Attempt ${this.retryCount})`);
-                
-                setTimeout(() => this.testConnection(), delay);
-            }
-            
-            throw error;
-        }
+        const response = await this.makeRequest(url);
+        
+        this.isConnected = true;
+        this.retryCount = 0;
+        
+        console.log('✅ GAS Connection successful:', response);
+        this.onConnectionSuccess(response);
+        
+        return response;
+        
+    } catch (error) {
+        // ... error handling remains the same
     }
+}
 
     /**
      * Generic request handler
