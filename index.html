@@ -1,152 +1,135 @@
 /**
- * SmartStore 360 - JSONP Compatible Backend
- * FIXED VERSION
+ * SmartStore 360 - GAS API Connector
+ * JSONP Version - WORKING
  */
 
-function doGet(e) {
-  return handleJsonpRequest(e);
-}
+class GASConnector {
+    constructor() {
+        this.baseUrl = 'https://script.google.com/macros/s/AKfycbzHuHzK0H0OI0LrwAYY7taRKBw5d7Q76Vzr0v7FY37RwssszhkeCYMYRRfijMci5iym9Q/exec';
+        this.isConnected = false;
+        this.callbacks = new Map();
+        this.callbackId = 0;
+    }
 
-function doPost(e) {
-  return handleJsonpRequest(e);
-}
+    /**
+     * JSONP Request - Bypasses CORS
+     */
+    jsonpRequest(params = {}) {
+        return new Promise((resolve, reject) => {
+            const callbackName = 'gas_jsonp_' + Date.now() + '_' + this.callbackId++;
+            
+            // Store callback
+            this.callbacks.set(callbackName, { resolve, reject });
+            
+            // Create global callback
+            window[callbackName] = (response) => {
+                this.cleanupJsonp(callbackName);
+                if (response && response.status === 'success') {
+                    resolve(response);
+                } else {
+                    reject(new Error(response?.message || 'JSONP error'));
+                }
+            };
+            
+            // Build URL
+            const urlParams = new URLSearchParams({
+                ...params,
+                callback: callbackName,
+                _: Date.now()
+            });
+            
+            const url = `${this.baseUrl}?${urlParams}`;
+            console.log('🔗 JSONP URL:', url);
+            
+            // Create script tag
+            const script = document.createElement('script');
+            script.src = url;
+            
+            script.onerror = () => {
+                this.cleanupJsonp(callbackName);
+                reject(new Error('Failed to load script'));
+            };
+            
+            // Timeout
+            const timeoutId = setTimeout(() => {
+                this.cleanupJsonp(callbackName);
+                reject(new Error('Timeout'));
+            }, 10000);
+            
+            this.callbacks.get(callbackName).timeoutId = timeoutId;
+            
+            // Inject script - THIS MAKES THE REQUEST
+            document.head.appendChild(script);
+        });
+    }
 
-function handleJsonpRequest(e) {
-  const parameters = e.parameter;
-  const callback = parameters.callback || 'callback';
-  const action = parameters.action || 'test';
-  
-  console.log(`📨 JSONP Request - Action: ${action}`);
-  
-  let result;
-  
-  try {
-    switch (action) {
-      case 'test':
-        result = {
-          status: 'success',
-          message: '🎉 SmartStore 360 JSONP API is working!',
-          version: '2.0',
-          timestamp: new Date().toISOString(),
-          data: {
-            server: 'Google Apps Script',
-            method: 'JSONP',
-            cors: 'Bypassed'
-          }
-        };
-        break;
-        
-      case 'getProducts':
-        result = {
-          status: 'success',
-          products: [
-            { id: 1, name: 'Wireless Headphones', price: 79.99, category: 'electronics', stock: 15 },
-            { id: 2, name: 'Cotton T-Shirt', price: 19.99, category: 'clothing', stock: 50 },
-            { id: 3, name: 'Water Bottle', price: 24.99, category: 'home', stock: 30 }
-          ],
-          total: 3,
-          category: parameters.category || 'all'
-        };
-        break;
-        
-      case 'getOrders':
-        result = {
-          status: 'success',
-          orders: [
-            { id: 1001, customer: 'John Doe', total: 159.98, status: 'completed' },
-            { id: 1002, customer: 'Jane Smith', total: 44.98, status: 'pending' }
-          ],
-          total: 2,
-          status: parameters.status || 'all'
-        };
-        break;
-        
-      case 'getInventory':
-        result = {
-          status: 'success',
-          inventory: [
-            { id: 1, name: 'Wireless Headphones', stock: 15, lowStock: false },
-            { id: 2, name: 'Cotton T-Shirt', stock: 50, lowStock: false },
-            { id: 3, name: 'Water Bottle', stock: 2, lowStock: true }
-          ],
-          totalItems: 3,
-          lowStockCount: 1
-        };
-        break;
-        
-      case 'getDashboardData':
-        result = {
-          status: 'success',
-          summary: {
-            totalSales: 404.96,
-            totalOrders: 3,
-            totalProducts: 5,
-            totalCustomers: 3
-          },
-          recentActivity: [
-            { type: 'order', message: 'New order #1002', time: '2 hours ago' },
-            { type: 'stock', message: 'Water Bottle running low', time: '1 day ago' }
-          ]
-        };
-        break;
-        
-      case 'addProduct':
-        result = {
-          status: 'success',
-          message: 'Product added successfully',
-          product: {
-            id: Date.now(),
-            name: parameters.name,
-            price: parseFloat(parameters.price),
-            category: parameters.category,
-            stock: parseInt(parameters.stock) || 0
-          }
-        };
-        break;
-        
-      case 'createOrder':
-        result = {
-          status: 'success',
-          message: 'Order created successfully',
-          order: {
-            id: Date.now(),
-            customer: parameters.customer,
-            total: parseFloat(parameters.total),
-            status: 'pending'
-          }
-        };
-        break;
-        
-      default:
-        result = {
-          status: 'error',
-          message: 'Unknown action: ' + action,
-          availableActions: [
-            'test', 'getProducts', 'addProduct', 'updateProduct', 'deleteProduct',
-            'getOrders', 'createOrder', 'updateOrderStatus', 'getInventory',
-            'updateStock', 'getSalesReport', 'getDashboardData'
-          ]
+    cleanupJsonp(callbackName) {
+        const callbackInfo = this.callbacks.get(callbackName);
+        if (callbackInfo?.timeoutId) {
+            clearTimeout(callbackInfo.timeoutId);
+        }
+        delete window[callbackName];
+        this.callbacks.delete(callbackName);
+    }
+
+    async testConnection() {
+        console.log('🔍 Testing GAS connection...');
+        try {
+            const response = await this.jsonpRequest({ action: 'test' });
+            this.isConnected = true;
+            console.log('✅ GAS Connection successful:', response);
+            
+            // Dispatch event
+            const event = new CustomEvent('gas-connected', { 
+                detail: { response, timestamp: new Date() }
+            });
+            window.dispatchEvent(event);
+            
+            return response;
+        } catch (error) {
+            this.isConnected = false;
+            console.error('❌ GAS Connection failed:', error);
+            
+            const event = new CustomEvent('gas-error', { 
+                detail: { error, timestamp: new Date() }
+            });
+            window.dispatchEvent(event);
+            
+            throw error;
+        }
+    }
+
+    async getProducts(category = 'all') {
+        return this.jsonpRequest({ action: 'getProducts', category });
+    }
+
+    async getOrders(status = 'all') {
+        return this.jsonpRequest({ action: 'getOrders', status });
+    }
+
+    async getInventory() {
+        return this.jsonpRequest({ action: 'getInventory' });
+    }
+
+    async getDashboardData() {
+        return this.jsonpRequest({ action: 'getDashboardData' });
+    }
+
+    async addProduct(productData) {
+        return this.jsonpRequest({ action: 'addProduct', ...productData });
+    }
+
+    async createOrder(orderData) {
+        return this.jsonpRequest({ action: 'createOrder', ...orderData });
+    }
+
+    getConnectionStatus() {
+        return {
+            isConnected: this.isConnected,
+            baseUrl: this.baseUrl
         };
     }
-    
-  } catch (error) {
-    console.error('❌ Backend Error:', error);
-    result = {
-      status: 'error',
-      message: error.toString(),
-      timestamp: new Date().toISOString()
-    };
-  }
-  
-  // Add timestamp if not already present
-  if (!result.timestamp) {
-    result.timestamp = new Date().toISOString();
-  }
-  
-  // Return as JSONP - THIS IS CRITICAL
-  const jsonpResponse = `/***/ typeof ${callback} === 'function' && ${callback}(${JSON.stringify(result)});`;
-  
-  return ContentService.createTextOutput(jsonpResponse)
-    .setMimeType(ContentService.MimeType.JAVASCRIPT)
-    .setHeader('Access-Control-Allow-Origin', '*');
 }
+
+// Create global instance
+const gasAPI = new GASConnector();
