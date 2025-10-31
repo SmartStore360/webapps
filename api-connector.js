@@ -1,6 +1,6 @@
 /**
  * SmartStore 360 - GAS API Connector
- * JSONP Version - Bypasses CORS completely
+ * JSONP Version - WORKING SOLUTION
  */
 
 class GASConnector {
@@ -9,52 +9,78 @@ class GASConnector {
         this.isConnected = false;
         this.callbacks = new Map();
         this.callbackId = 0;
+        
+        console.log('🔌 GAS Connector Initialized with JSONP');
     }
 
     /**
-     * JSONP Request - Bypasses CORS
+     * JSONP Request - Bypasses CORS completely
      */
-    jsonpRequest(params) {
+    jsonpRequest(params = {}) {
         return new Promise((resolve, reject) => {
-            const callbackName = 'gas_callback_' + this.callbackId++;
+            const callbackName = 'gas_jsonp_' + Date.now() + '_' + this.callbackId++;
             
+            // Store the callback
             this.callbacks.set(callbackName, { resolve, reject });
             
-            // Add callback to window
+            // Create global callback function
             window[callbackName] = (response) => {
+                console.log('📨 JSONP Response received:', response);
                 this.cleanupJsonp(callbackName);
                 resolve(response);
             };
             
-            // Create script tag
-            const script = document.createElement('script');
+            // Build URL with callback parameter
             const urlParams = new URLSearchParams({
                 ...params,
-                callback: callbackName
+                callback: callbackName,
+                _: Date.now() // Cache buster
             });
             
-            script.src = `${this.baseUrl}?${urlParams.toString()}`;
-            script.onerror = () => {
+            const url = `${this.baseUrl}?${urlParams.toString()}`;
+            console.log('🔗 JSONP Calling:', url);
+            
+            // Create and inject script tag
+            const script = document.createElement('script');
+            script.src = url;
+            script.onerror = (error) => {
+                console.error('❌ JSONP Script failed to load:', error);
                 this.cleanupJsonp(callbackName);
-                reject(new Error('JSONP request failed'));
+                reject(new Error('Failed to load GAS script'));
             };
             
+            // Set timeout for JSONP request
+            const timeoutId = setTimeout(() => {
+                this.cleanupJsonp(callbackName);
+                reject(new Error('JSONP request timeout'));
+            }, 10000);
+            
+            // Store timeout ID for cleanup
+            this.callbacks.get(callbackName).timeoutId = timeoutId;
+            
+            // Inject script
             document.head.appendChild(script);
         });
     }
 
     cleanupJsonp(callbackName) {
+        // Clear timeout
+        const callbackInfo = this.callbacks.get(callbackName);
+        if (callbackInfo && callbackInfo.timeoutId) {
+            clearTimeout(callbackInfo.timeoutId);
+        }
+        
+        // Remove callback from window
         delete window[callbackName];
         this.callbacks.delete(callbackName);
         
-        // Remove any script tags we created
-        const scripts = document.head.getElementsByTagName('script');
-        for (let script of scripts) {
-            if (script.src.includes('callback=' + callbackName)) {
-                document.head.removeChild(script);
-                break;
+        // Remove script tags (cleanup)
+        const scripts = document.querySelectorAll(`script[src*="callback=${callbackName}"]`);
+        scripts.forEach(script => {
+            if (script.parentNode) {
+                script.parentNode.removeChild(script);
             }
-        }
+        });
     }
 
     /**
@@ -68,14 +94,25 @@ class GASConnector {
             
             this.isConnected = true;
             console.log('✅ GAS Connection successful:', response);
-            this.onConnectionSuccess(response);
+            
+            // Dispatch success event
+            const event = new CustomEvent('gas-connected', { 
+                detail: { response, timestamp: new Date() }
+            });
+            window.dispatchEvent(event);
             
             return response;
             
         } catch (error) {
             this.isConnected = false;
             console.error('❌ GAS Connection failed:', error);
-            this.onConnectionError(error);
+            
+            // Dispatch error event
+            const event = new CustomEvent('gas-error', { 
+                detail: { error, timestamp: new Date() }
+            });
+            window.dispatchEvent(event);
+            
             throw error;
         }
     }
@@ -88,18 +125,15 @@ class GASConnector {
     }
 
     async addProduct(productData) {
-        // For POST-like actions with JSONP, we send data as URL parameters
-        const params = { action: 'addProduct', ...productData };
-        return this.jsonpRequest(params);
+        return this.jsonpRequest({ action: 'addProduct', ...productData });
     }
 
     async updateProduct(productId, productData) {
-        const params = { 
+        return this.jsonpRequest({ 
             action: 'updateProduct', 
             id: productId,
             ...productData 
-        };
-        return this.jsonpRequest(params);
+        });
     }
 
     async deleteProduct(productId) {
@@ -114,8 +148,7 @@ class GASConnector {
     }
 
     async createOrder(orderData) {
-        const params = { action: 'createOrder', ...orderData };
-        return this.jsonpRequest(params);
+        return this.jsonpRequest({ action: 'createOrder', ...orderData });
     }
 
     async updateOrderStatus(orderId, status) {
@@ -157,27 +190,18 @@ class GASConnector {
     }
 
     /**
-     * Event handlers
+     * Utility methods
      */
-    onConnectionSuccess(response) {
-        const event = new CustomEvent('gas-connected', { 
-            detail: { response, timestamp: new Date() }
-        });
-        window.dispatchEvent(event);
-    }
-
-    onConnectionError(error) {
-        const event = new CustomEvent('gas-error', { 
-            detail: { error, timestamp: new Date() }
-        });
-        window.dispatchEvent(event);
-    }
-
     getConnectionStatus() {
         return {
             isConnected: this.isConnected,
             baseUrl: this.baseUrl
         };
+    }
+
+    resetConnection() {
+        this.isConnected = false;
+        return this.testConnection();
     }
 }
 
