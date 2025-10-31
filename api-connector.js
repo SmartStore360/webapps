@@ -3,7 +3,7 @@
  * Using your actual GAS URL
  */
 
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxSpy3MfKkb00DXYHAuBlhSiWZXnwtJfAe8wzxDqzTy1BojSM_lhKIsycXpIGKDDt_u-Q/exec';
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxEPqPsH_DeH4KflEwHHStbjD4Bj5HnJQpsfkR67QvapG__zlzTYdX1q_FQpZdjggpMcA/exec';
 
 class GASConnector {
     constructor() {
