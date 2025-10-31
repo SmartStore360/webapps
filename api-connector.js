@@ -6,7 +6,7 @@
 
 class GASConnector {
     constructor() {
-        this.baseUrl = 'https://script.google.com/macros/s/AKfycbzHuHzK0H0OI0LrwAYY7taRKBw5d7Q76Vzr0v7FY37RwssszhkeCYMYRRfijMci5iym9Q/exec';
+        this.baseUrl = 'https://script.google.com/macros/s/AKfycbzL2NyV1GfvRqBYeFB0DI-0IjrsRZiULNVRNXShR7k3xTPF4B1WOzFKc15C6VSIRY8Reg/exec';
         this.isConnected = false;
         this.callbacks = new Map();
         this.callbackId = 0;
@@ -224,3 +224,4 @@ class GASConnector {
 
 // Create global instance
 const gasAPI = new GASConnector();
+
