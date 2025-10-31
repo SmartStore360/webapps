@@ -1,96 +1,108 @@
-// SIMPLE app.js - REPLACE YOUR CURRENT INITIALIZATION
+/**
+ * SmartStore 360 - Main App
+ * SIMPLE TEST VERSION
+ */
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 SmartStore 360 App Initializing...');
     
-    // Test JSONP connection after a short delay
-    setTimeout(() => {
-        console.log('🔄 Starting JSONP connection test...');
-        gasAPI.testConnection()
-            .then(data => {
-                console.log('🎉 JSONP Connection Successful!', data);
-                showSuccessMessage('✅ Backend connected via JSONP!');
-                
-                // Load initial data
-                loadInitialData();
-            })
-            .catch(error => {
-                console.error('💥 JSONP Connection failed:', error);
-                showErrorMessage('❌ Backend connection failed: ' + error.message);
-            });
-    }, 1000);
+    // Create a simple test UI
+    createTestUI();
     
     console.log('✅ SmartStore 360 App Ready!');
 });
 
-async function loadInitialData() {
-    try {
-        console.log('📦 Loading initial data via JSONP...');
-        const [products, dashboard] = await Promise.all([
-            gasAPI.getProducts(),
-            gasAPI.getDashboardData()
-        ]);
-        
-        console.log('📦 Initial data loaded successfully!', { 
-            products: products.products.length,
-            dashboard: dashboard.summary 
-        });
-        
-        // Update UI with the data
-        updateUI(products, dashboard);
-        
-    } catch (error) {
-        console.error('❌ Failed to load initial data:', error);
-    }
-}
-
-function updateUI(products, dashboard) {
-    // Update your UI here
-    console.log('🎨 Updating UI with loaded data...');
+function createTestUI() {
+    const testUI = `
+        <div style="padding: 20px; font-family: Arial, sans-serif;">
+            <h1>🧪 SmartStore 360 - JSONP Test</h1>
+            <div style="margin: 10px 0;">
+                <button onclick="testConnection()" style="padding: 10px; margin: 5px;">Test Connection</button>
+                <button onclick="getProducts()" style="padding: 10px; margin: 5px;">Get Products</button>
+                <button onclick="getDashboard()" style="padding: 10px; margin: 5px;">Get Dashboard</button>
+            </div>
+            <div id="result" style="border: 1px solid #ccc; padding: 15px; margin: 10px 0; min-height: 100px; background: #f9f9f9;"></div>
+        </div>
+    `;
     
-    // Example: Update a products container
-    const productsContainer = document.getElementById('products-container');
-    if (productsContainer) {
-        productsContainer.innerHTML = '<h3>Products (' + products.products.length + ')</h3>';
-        products.products.forEach(product => {
-            productsContainer.innerHTML += `
-                <div class="product">
-                    <strong>${product.name}</strong> - $${product.price} 
-                    (Stock: ${product.stock})
-                </div>
-            `;
-        });
+    document.body.innerHTML = testUI;
+    
+    // Auto-test connection
+    setTimeout(testConnection, 1000);
+}
+
+async function testConnection() {
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '<div style="color: blue;">🔄 Testing JSONP connection...</div>';
+    
+    try {
+        const response = await gasAPI.testConnection();
+        resultDiv.innerHTML = `
+            <div style="color: green;">
+                <h3>✅ JSONP Connection Successful!</h3>
+                <pre>${JSON.stringify(response, null, 2)}</pre>
+            </div>
+        `;
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div style="color: red;">
+                <h3>❌ JSONP Connection Failed</h3>
+                <p><strong>Error:</strong> ${error.message}</p>
+                <p><strong>Details:</strong> Make sure you replaced api-connector.js with JSONP version</p>
+            </div>
+        `;
     }
 }
 
-function showSuccessMessage(message) {
-    const alert = document.createElement('div');
-    alert.style.cssText = `
-        position: fixed; top: 20px; right: 20px; background: #4CAF50; 
-        color: white; padding: 15px; border-radius: 5px; z-index: 1000;
-        font-family: Arial, sans-serif;
-    `;
-    alert.textContent = message;
-    document.body.appendChild(alert);
-    setTimeout(() => alert.remove(), 5000);
+async function getProducts() {
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '<div style="color: blue;">🔄 Loading products via JSONP...</div>';
+    
+    try {
+        const response = await gasAPI.getProducts();
+        resultDiv.innerHTML = `
+            <div style="color: green;">
+                <h3>✅ Products Loaded via JSONP!</h3>
+                <pre>${JSON.stringify(response, null, 2)}</pre>
+            </div>
+        `;
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div style="color: red;">
+                <h3>❌ Failed to load products</h3>
+                <p><strong>Error:</strong> ${error.message}</p>
+            </div>
+        `;
+    }
 }
 
-function showErrorMessage(message) {
-    const alert = document.createElement('div');
-    alert.style.cssText = `
-        position: fixed; top: 20px; right: 20px; background: #f44336; 
-        color: white; padding: 15px; border-radius: 5px; z-index: 1000;
-        font-family: Arial, sans-serif;
-    `;
-    alert.textContent = message;
-    document.body.appendChild(alert);
-    setTimeout(() => alert.remove(), 5000);
+async function getDashboard() {
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '<div style="color: blue;">🔄 Loading dashboard via JSONP...</div>';
+    
+    try {
+        const response = await gasAPI.getDashboardData();
+        resultDiv.innerHTML = `
+            <div style="color: green;">
+                <h3>✅ Dashboard Loaded via JSONP!</h3>
+                <pre>${JSON.stringify(response, null, 2)}</pre>
+            </div>
+        `;
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div style="color: red;">
+                <h3>❌ Failed to load dashboard</h3>
+                <p><strong>Error:</strong> ${error.message}</p>
+            </div>
+        `;
+    }
 }
 
 // Listen for connection events
 window.addEventListener('gas-connected', (event) => {
-    console.log('🌐 Backend connection event received:', event.detail);
+    console.log('🌐 Backend connected:', event.detail);
 });
 
 window.addEventListener('gas-error', (event) => {
-    console.error('💥 Backend error event received:', event.detail);
+    console.error('💥 Backend error:', event.detail);
 });
