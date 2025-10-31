@@ -1,6 +1,6 @@
 /**
  * SMARTSTORE 360 - API CONNECTOR
- * Using your actual GAS URL
+ * Final working version
  */
 
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxEPqPsH_DeH4KflEwHHStbjD4Bj5HnJQpsfkR67QvapG__zlzTYdX1q_FQpZdjggpMcA/exec';
@@ -11,21 +11,24 @@ class GASConnector {
     }
 
     async callGASFunction(functionName, data = {}) {
+        console.log(`📞 Calling GAS: ${functionName}`, data);
+        
         return new Promise((resolve, reject) => {
-            const callbackName = `gas_callback_${Date.now()}`;
+            const callbackName = `gas_${Date.now()}`;
             const timeoutId = setTimeout(() => {
                 this.cleanupJSONP(callbackName, script);
-                reject(new Error('Request timeout after 30 seconds'));
+                reject(new Error('Timeout: Server took too long to respond'));
             }, 30000);
 
             window[callbackName] = (response) => {
+                console.log(`📨 GAS Response:`, response);
                 clearTimeout(timeoutId);
                 this.cleanupJSONP(callbackName, script);
                 
                 if (response && response.success !== false) {
                     resolve(response);
                 } else {
-                    reject(new Error(response?.message || 'Server returned an error'));
+                    reject(new Error(response?.message || `Function ${functionName} failed`));
                 }
             };
 
@@ -42,7 +45,7 @@ class GASConnector {
             script.onerror = () => {
                 clearTimeout(timeoutId);
                 this.cleanupJSONP(callbackName, script);
-                reject(new Error(`Failed to load script. Check GAS deployment settings.`));
+                reject(new Error(`Cannot connect to Google Apps Script. Please check deployment settings.`));
             };
 
             document.head.appendChild(script);
@@ -56,32 +59,27 @@ class GASConnector {
                 script.parentElement.removeChild(script);
             }
         } catch (error) {
-            console.warn('Cleanup error:', error);
+            console.warn('Cleanup warning:', error);
         }
     }
 
-    async callWithRetry(functionName, data = {}, maxRetries = 3) {
-        let lastError;
-        
+    async callWithRetry(functionName, data = {}, maxRetries = 2) {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                console.log(`🔄 Attempt ${attempt}/${maxRetries} for ${functionName}`);
                 return await this.callGASFunction(functionName, data);
             } catch (error) {
-                lastError = error;
-                if (attempt < maxRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                }
+                console.log(`🔄 Attempt ${attempt} failed:`, error.message);
+                if (attempt === maxRetries) throw error;
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
         }
-        throw lastError;
     }
 }
 
 // Create global instance
 const gasAPI = new GASConnector();
 
-// Mock google.script.run for compatibility
+// Mock google.script.run
 window.google = window.google || {};
 window.google.script = window.google.script || {};
 window.google.script.run = {
@@ -95,7 +93,13 @@ window.google.script.run = {
         return this;
     },
     
-    // Authentication
+    testConnection() {
+        gasAPI.callGASFunction('testConnection')
+            .then(this.successCallback)
+            .catch(this.failureCallback);
+        return this;
+    },
+
     login(username, password) {
         gasAPI.callWithRetry('login', { username, password })
             .then(this.successCallback)
@@ -103,16 +107,22 @@ window.google.script.run = {
         return this;
     },
 
-    changePassword(currentUser, targetUser, newPassword, oldPassword, isManager) {
-        gasAPI.callWithRetry('changePassword', { currentUser, targetUser, newPassword, oldPassword, isManager })
+    getInventoryData() {
+        gasAPI.callWithRetry('getInventoryData')
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
     },
 
-    // Inventory
-    getInventoryData() {
-        gasAPI.callWithRetry('getInventoryData')
+    submitSaleData(saleData) {
+        gasAPI.callWithRetry('submitSaleData', saleData)
+            .then(this.successCallback)
+            .catch(this.failureCallback);
+        return this;
+    },
+
+    generateReport(params) {
+        gasAPI.callWithRetry('generateReport', params)
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
@@ -146,14 +156,6 @@ window.google.script.run = {
         return this;
     },
 
-    // Sales
-    submitSaleData(saleData) {
-        gasAPI.callWithRetry('submitSaleData', saleData)
-            .then(this.successCallback)
-            .catch(this.failureCallback);
-        return this;
-    },
-
     getTodaysSalesBreakdown() {
         gasAPI.callWithRetry('getTodaysSalesBreakdown')
             .then(this.successCallback)
@@ -161,15 +163,6 @@ window.google.script.run = {
         return this;
     },
 
-    // Reports
-    generateReport(params) {
-        gasAPI.callWithRetry('generateReport', params)
-            .then(this.successCallback)
-            .catch(this.failureCallback);
-        return this;
-    },
-
-    // Users
     getAllUsers() {
         gasAPI.callWithRetry('getAllUsers')
             .then(this.successCallback)
@@ -196,42 +189,53 @@ window.google.script.run = {
             .then(this.successCallback)
             .catch(this.failureCallback);
         return this;
+    },
+
+    changePassword(currentUser, targetUser, newPassword, oldPassword, isManager) {
+        gasAPI.callWithRetry('changePassword', { currentUser, targetUser, newPassword, oldPassword, isManager })
+            .then(this.successCallback)
+            .catch(this.failureCallback);
+        return this;
     }
 };
 
 // Test connection
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(async () => {
+        const testDiv = document.createElement('div');
+        testDiv.style.cssText = `
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #3b82f6;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            z-index: 10000;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+        `;
+        testDiv.textContent = '🔍 Testing connection to Google Apps Script...';
+        document.body.appendChild(testDiv);
+
         try {
-            console.log('🔍 Testing GAS connection...');
             const result = await gasAPI.callGASFunction('testConnection', {});
+            testDiv.style.background = '#10b981';
+            testDiv.innerHTML = '✅ Connected to Google Apps Script successfully!';
             console.log('✅ GAS Connection successful:', result);
-        } catch (error) {
-            console.error('❌ GAS Connection failed:', error.message);
             
-            // Show helpful error message
-            const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = `
-                position: fixed;
-                top: 10px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: #ef4444;
-                color: white;
-                padding: 15px;
-                border-radius: 5px;
-                z-index: 10000;
-                max-width: 500px;
-                text-align: center;
-                font-family: Arial, sans-serif;
+            setTimeout(() => testDiv.remove(), 5000);
+        } catch (error) {
+            testDiv.style.background = '#ef4444';
+            testDiv.innerHTML = `
+                ❌ Connection Failed
+                <br><small>${error.message}</small>
+                <br><small>Check GAS deployment and doPost() function</small>
             `;
-            errorDiv.innerHTML = `
-                <strong>Connection Error:</strong> ${error.message}
-                <br><small>Please check your GAS deployment settings</small>
-            `;
-            document.body.appendChild(errorDiv);
+            console.error('❌ GAS Connection failed:', error);
         }
     }, 1000);
 });
 
-console.log('🚀 SmartStore 360 API Connector Loaded with your GAS URL');
+console.log('🚀 SmartStore 360 API Connector Loaded');
