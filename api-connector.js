@@ -1,35 +1,29 @@
-// ULTRA-SIMPLE API CONNECTOR
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzsPAgFCeySVAdFyvGxgyewCwrB3Md8Yes9Y0iZtToW65pOiR2Ck8NddYgocDTnehF-/exec'; // ⬅️ REPLACE THIS!
+// SIMPLE WORKING API CONNECTOR
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzHuHzK0H0OI0LrwAYY7taRKBw5d7Q76Vzr0v7FY37RwssszhkeCYMYRRfijMci5iym9Q/exec'; // ⬅️ REPLACE WITH NEW URL
 
-async function callGAS(functionName, data = {}) {
+function callGAS(functionName, data = {}) {
     return new Promise((resolve, reject) => {
-        const callbackName = `cb_${Date.now()}`;
-        const timeout = setTimeout(() => {
-            cleanup();
-            reject(new Error('Timeout'));
-        }, 10000);
-
-        function cleanup() {
+        const callbackName = `gas_${Date.now()}`;
+        
+        window[callbackName] = function(response) {
             delete window[callbackName];
             if (script.parentNode) script.parentNode.removeChild(script);
-            clearTimeout(timeout);
-        }
-
-        window[callbackName] = (response) => {
-            cleanup();
             resolve(response);
         };
 
         const params = new URLSearchParams();
         params.append('function', functionName);
         params.append('callback', callbackName);
-        params.append('data', JSON.stringify(data));
+        if (Object.keys(data).length > 0) {
+            params.append('data', JSON.stringify(data));
+        }
 
         const script = document.createElement('script');
-        script.src = `${GAS_WEB_APP_URL}?${params}`;
-        script.onerror = () => {
-            cleanup();
-            reject(new Error(`Failed to connect to: ${GAS_WEB_APP_URL}`));
+        script.src = `${GAS_WEB_APP_URL}?${params.toString()}`;
+        script.onerror = function() {
+            delete window[callbackName];
+            if (script.parentNode) script.parentNode.removeChild(script);
+            reject(new Error(`Failed to load GAS script. Check deployment.`));
         };
 
         document.head.appendChild(script);
@@ -40,39 +34,105 @@ async function callGAS(functionName, data = {}) {
 window.google = window.google || {};
 window.google.script = window.google.script || {};
 window.google.script.run = {
-    withSuccessHandler(cb) { this.success = cb; return this; },
-    withFailureHandler(cb) { this.failure = cb; return this; },
+    withSuccessHandler(callback) {
+        this.successCallback = callback;
+        return this;
+    },
+    withFailureHandler(callback) {
+        this.failureCallback = callback;
+        return this;
+    },
     
-    testConnection() { callGAS('testConnection').then(this.success).catch(this.failure); return this; },
-    login(u,p) { callGAS('login', {username:u,password:p}).then(this.success).catch(this.failure); return this; },
-    getInventoryData() { callGAS('getInventoryData').then(this.success).catch(this.failure); return this; },
-    submitSaleData(d) { callGAS('submitSaleData', d).then(this.success).catch(this.failure); return this; },
-    generateReport(p) { callGAS('generateReport', p).then(this.success).catch(this.failure); return this; },
-    addInventoryItem(i,u) { callGAS('addInventoryItem', {...i,username:u}).then(this.success).catch(this.failure); return this; },
-    updateInventoryItem(i,u) { callGAS('updateInventoryItem', {...i,username:u}).then(this.success).catch(this.failure); return this; },
-    deleteInventoryItem(n,u) { callGAS('deleteInventoryItem', {itemName:n,username:u}).then(this.success).catch(this.failure); return this; },
-    bulkUploadInventory(i,u) { callGAS('bulkUploadInventory', {items:i,username:u}).then(this.success).catch(this.failure); return this; },
-    getTodaysSalesBreakdown() { callGAS('getTodaysSalesBreakdown').then(this.success).catch(this.failure); return this; },
-    getAllUsers() { callGAS('getAllUsers').then(this.success).catch(this.failure); return this; },
-    getAllUsernames() { callGAS('getAllUsernames').then(this.success).catch(this.failure); return this; },
-    addUser(u,c) { callGAS('addUser', {...u,currentUser:c}).then(this.success).catch(this.failure); return this; },
-    deleteUser(u,c) { callGAS('deleteUser', {username:u,currentUser:c}).then(this.success).catch(this.failure); return this; },
-    changePassword(c,t,n,o,i) { callGAS('changePassword', {currentUser:c,targetUser:t,newPassword:n,oldPassword:o,isManager:i}).then(this.success).catch(this.failure); return this; }
+    testConnection() {
+        callGAS('testConnection').then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    login(username, password) {
+        callGAS('login', { username, password }).then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    getInventoryData() {
+        callGAS('getInventoryData').then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    submitSaleData(saleData) {
+        callGAS('submitSaleData', saleData).then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    generateReport(params) {
+        callGAS('generateReport', params).then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    addInventoryItem(itemData, username) {
+        callGAS('addInventoryItem', { ...itemData, username }).then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    updateInventoryItem(itemData, username) {
+        callGAS('updateInventoryItem', { ...itemData, username }).then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    deleteInventoryItem(itemName, username) {
+        callGAS('deleteInventoryItem', { itemName, username }).then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    bulkUploadInventory(items, username) {
+        callGAS('bulkUploadInventory', { items, username }).then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    getTodaysSalesBreakdown() {
+        callGAS('getTodaysSalesBreakdown').then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    getAllUsers() {
+        callGAS('getAllUsers').then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    getAllUsernames() {
+        callGAS('getAllUsernames').then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    addUser(userData, currentUser) {
+        callGAS('addUser', { ...userData, currentUser }).then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    deleteUser(username, currentUser) {
+        callGAS('deleteUser', { username, currentUser }).then(this.successCallback).catch(this.failureCallback);
+        return this;
+    },
+    changePassword(currentUser, targetUser, newPassword, oldPassword, isManager) {
+        callGAS('changePassword', { currentUser, targetUser, newPassword, oldPassword, isManager }).then(this.successCallback).catch(this.failureCallback);
+        return this;
+    }
 };
 
-// Test connection
+// Test connection on load
 setTimeout(() => {
     const status = document.createElement('div');
-    status.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#3b82f6;color:white;padding:15px;border-radius:5px;z-index:10000;font-family:Arial;text-align:center;';
-    status.innerHTML = 'Testing connection...';
+    status.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #3b82f6;
+        color: white;
+        padding: 15px 25px;
+        border-radius: 8px;
+        z-index: 10000;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    `;
+    status.innerHTML = '🔄 Testing GAS Connection...';
     document.body.appendChild(status);
 
-    callGAS('testConnection').then(result => {
-        status.style.background = '#10b981';
-        status.innerHTML = '✅ Connected!';
-        setTimeout(() => status.remove(), 3000);
-    }).catch(error => {
-        status.style.background = '#ef4444';
-        status.innerHTML = `❌ Failed: ${error.message}`;
-    });
+    callGAS('testConnection')
+        .then(result => {
+            status.style.background = '#10b981';
+            status.innerHTML = '✅ Connected to GAS!';
+            setTimeout(() => status.remove(), 4000);
+        })
+        .catch(error => {
+            status.style.background = '#ef4444';
+            status.innerHTML = `❌ Connection Failed<br><small>${error.message}</small>`;
+        });
 }, 1000);
