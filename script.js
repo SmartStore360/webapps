@@ -13,7 +13,7 @@ function runGoogle(fn) {
 
 /* ==================== SCREEN HELPERS ==================== */
 function showSection(id) {
-  document.querySelectorAll('#app > div[id$="Section"], #app > .card').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('#app > [id$="Section"], #app > .card').forEach(el => el.classList.add('hidden'));
   const el = document.getElementById(id);
   if (el) el.classList.remove('hidden');
 }
@@ -33,8 +33,11 @@ document.getElementById('login').addEventListener('submit', e => {
   const password = document.getElementById('password').value;
   const err = document.getElementById('loginError');
 
-  if (!username || !password) { err.textContent = 'Fill both fields'; return; }
-  err.textContent = 'Signing in…';
+  if (!username || !password) {
+    err.textContent = 'Enter username and password';
+    return;
+  }
+  err.textContent = 'Signing in...';
 
   runGoogle(() => {
     google.script.run
@@ -43,13 +46,17 @@ document.getElementById('login').addEventListener('submit', e => {
           currentUser = res.user;
           err.textContent = '';
           hideLogin();
-          loadDashboard();          // first load
-          initNavigation();        // set up side-menu clicks
+          loadDashboard();
+          initNavigation();
+          updateTime();
+          document.getElementById('welcomeMessage').textContent = `Welcome, ${res.user.username}`;
         } else {
           err.textContent = res.message || 'Login failed';
         }
       })
-      .withFailureHandler(e => { err.textContent = 'Network error: ' + e.message; })
+      .withFailureHandler(() => {
+        err.textContent = 'Connection failed';
+      })
       .login(username, password);
   });
 });
@@ -63,7 +70,7 @@ document.getElementById('logoutButton').addEventListener('click', () => {
   showLogin();
 });
 
-/* ==================== NAVIGATION (side menu) ==================== */
+/* ==================== NAVIGATION ==================== */
 function initNavigation() {
   document.querySelectorAll('#navMenu a[data-tab]').forEach(link => {
     link.addEventListener('click', ev => {
@@ -83,11 +90,12 @@ function loadDashboard() {
         if (!data.success) return;
         const d = data.data;
         document.getElementById('todaySales').textContent = `GHC ${d.todaysSalesAmount.toFixed(2)}`;
-        document.getElementById('todaySalesCount').textContent = `${d.todaysTransactionCount} transaction${d.todaysTransactionCount===1?'':'s'}`;
+        document.getElementById('todaySalesCount').textContent = `${d.todaysTransactionCount} transaction${d.todaysTransactionCount === 1 ? '' : 's'}`;
         document.getElementById('inventoryValue').textContent = `GHC ${d.inventoryValue.toFixed(2)}`;
-        document.getElementById('totalItems').textContent = `${d.inventoryItemCount} item${d.inventoryItemCount===1?'':'s'}`;
+        document.getElementById('totalItems').textContent = `${d.inventoryItemCount} item${d.inventoryItemCount === 1 ? '' : 's'}`;
         document.getElementById('lowStockCount').textContent = d.lowStockCount;
         document.getElementById('outOfStockCount').textContent = d.outOfStockCount;
+        document.getElementById('lastSyncTime').textContent = new Date().toLocaleTimeString();
       })
       .getDashboardOverview();
   });
@@ -97,7 +105,6 @@ function loadDashboard() {
   loadPerformanceSummary();
 }
 
-/* ----- Recent Sales ----- */
 function loadRecentSales() {
   runGoogle(() => {
     google.script.run
@@ -122,7 +129,6 @@ function loadRecentSales() {
   });
 }
 
-/* ----- Stock Alerts ----- */
 function loadStockAlerts() {
   runGoogle(() => {
     google.script.run
@@ -135,7 +141,7 @@ function loadStockAlerts() {
         }
         res.data.forEach(a => {
           const div = document.createElement('div');
-          div.className = `p-2 border-b ${a.status==='Out of Stock'?'text-red-400':'text-orange-400'}`;
+          div.className = `p-2 border-b ${a.status === 'Out of Stock' ? 'text-red-400' : 'text-orange-400'}`;
           div.innerHTML = `<strong>${a.name}</strong>: ${a.qty} left`;
           container.appendChild(div);
         });
@@ -144,7 +150,6 @@ function loadStockAlerts() {
   });
 }
 
-/* ----- Performance Summary ----- */
 function loadPerformanceSummary() {
   runGoogle(() => {
     google.script.run
@@ -172,12 +177,15 @@ function loadPerformanceSummary() {
   });
 }
 
+/* ==================== TIME ==================== */
+function updateTime() {
+  const now = new Date();
+  document.getElementById('currentDateTime').textContent = now.toLocaleString();
+  setTimeout(updateTime, 1000);
+}
+
 /* ==================== INITIAL LOAD ==================== */
 document.addEventListener('DOMContentLoaded', () => {
-  showLogin();               // start on login screen
-  // quick-action buttons (optional – you already have them in HTML)
-  document.getElementById('quickActionNewSale')?.addEventListener('click', () => showSection('salesSection'));
-  document.getElementById('quickActionViewInventory')?.addEventListener('click', () => showSection('inventorySection'));
-  document.getElementById('quickActionViewReports')?.addEventListener('click', () => showSection('reportsSection'));
-  document.getElementById('refreshDashboard')?.addEventListener('click', loadDashboard);
+  showLogin();
+  updateTime();
 });
