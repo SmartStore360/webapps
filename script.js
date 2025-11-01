@@ -1,5 +1,5 @@
 /* ====================  GLOBALS  ==================== */
-const SCRIPT_URL = 'YOUR_WEB_APP_URL_HERE'; // ← Replace with your Apps Script Web App URL
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzL2NyV1GfvRqBYeFB0DI-0IjrsRZiULNVRNXShR7k3xTPF4B1WOzFKc15C6VSIRY8Reg/exec'; // ← Replace with your Apps Script Web App URL
 let currentUser = null;
 
 /* ====================  SAFE GOOGLE RUN  ==================== */
@@ -143,3 +143,4 @@ document.querySelectorAll('.bottom-nav button').forEach(btn => {
 document.addEventListener('DOMContentLoaded', () => {
   showScreen('login-screen');
 });
+
