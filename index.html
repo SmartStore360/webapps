@@ -418,5 +418,25 @@
 
   <script src="api-connector.js"></script>
   <script src="app.js" defer></script>
+  <script>
+// Check authentication on main page
+document.addEventListener('DOMContentLoaded', function() {
+    const token = localStorage.getItem('authToken');
+    const user = localStorage.getItem('currentUser');
+    
+    console.log('🔐 Main page auth check:');
+    console.log('Token:', token);
+    console.log('User:', user);
+    
+    if (!token || !user) {
+        console.log('❌ Not authenticated, redirecting to login...');
+        window.location.href = 'login.html';
+    } else {
+        console.log('✅ Authenticated, loading app...');
+        // Your app will initialize normally
+    }
+});
+</script>
 </body>
 </html>
+
