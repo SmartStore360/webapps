@@ -114,3 +114,44 @@ function debugAuthStatus() {
         hasUser: !!localStorage.getItem('currentUser')
     });
 }
+
+let authToken = localStorage.getItem('token') || null;
+
+function callGAS(functionName, params = {}) {
+  return new Promise((resolve, reject) => {
+    const callbackName = 'callback' + Date.now();
+    window[callbackName] = (data) => {
+      delete window[callbackName];
+      const script = document.getElementById(callbackName);
+      if (script) script.remove();
+      if (data.success) {
+        if (data.token) {
+          authToken = data.token;
+          localStorage.setItem('token', authToken);
+        }
+        resolve(data);
+      } else {
+        reject(new Error(data.message));
+      }
+    };
+
+    const urlParams = new URLSearchParams();
+    urlParams.append('functionName', functionName);
+    urlParams.append('callback', callbackName);
+    if (authToken && functionName !== 'login') {
+      urlParams.append('token', authToken);
+    }
+    for (const [key, value] of Object.entries(params)) {
+      urlParams.append(key, JSON.stringify(value));
+    }
+
+    const script = document.createElement('script');
+    script.id = callbackName;
+    script.src = `${GAS_WEB_APP_URL}?${urlParams.toString()}`;
+    script.onerror = () => reject(new Error('Network error'));
+    document.body.appendChild(script);
+  });
+}
+
+// On login success: token saved in localStorage
+// On page load: read token from localStorage
