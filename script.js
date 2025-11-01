@@ -2,7 +2,7 @@
 
 // Configuration - UPDATE THIS WITH YOUR GAS WEB APP URL
 const CONFIG = {
-  gasWebAppUrl: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec', // Replace with your deployed GAS URL
+  gasWebAppUrl: 'https://script.google.com/macros/s/AKfycbzL2NyV1GfvRqBYeFB0DI-0IjrsRZiULNVRNXShR7k3xTPF4B1WOzFKc15C6VSIRY8Reg/exec', // Replace with your deployed GAS URL
   requestTimeout: 30000, // 30 seconds
   retryAttempts: 3
 };
@@ -2400,3 +2400,4 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log('SmartStore 360 Frontend initialized');
   console.log('Make sure to update CONFIG.gasWebAppUrl in script.js with your actual GAS Web App URL');
 });
+
