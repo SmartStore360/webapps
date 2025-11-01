@@ -1,5 +1,5 @@
 /* ====================  GLOBALS  ==================== */
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzL2NyV1GfvRqBYeFB0DI-0IjrsRZiULNVRNXShR7k3xTPF4B1WOzFKc15C6VSIRY8Reg/exec'; // ← Replace with your Apps Script Web App URL
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwm7kYfZ1q1pY6lZ9m5q7r8t9u0v1w2x3y4z5a6b7c8d9e/exec'; // ← Replace with your Apps Script Web App URL
 let currentUser = null;
 
 /* ====================  SAFE GOOGLE RUN  ==================== */
@@ -143,5 +143,6 @@ document.querySelectorAll('.bottom-nav button').forEach(btn => {
 document.addEventListener('DOMContentLoaded', () => {
   showScreen('login-screen');
 });
+
 
 
