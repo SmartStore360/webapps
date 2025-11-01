@@ -25,7 +25,6 @@
       <p class="footer-text">© 2025 SmartStore 360. All rights reserved.</p>
     </div>
   </div>
-
   <div id="app" class="container hidden">
     <div class="header flex items-center justify-between">
       <div class="flex items-center">
@@ -34,7 +33,7 @@
       </div>
       <button id="logoutButton" class="p-2 bg-error text-white rounded">Logout</button>
     </div>
-    
+   
     <nav id="navMenu" class="nav-menu">
       <ul>
         <li><a href="#" data-tab="dashboardSection" class="manager-only"><i class="fa-solid fa-gauge-high"></i>Dashboard</a></li>
@@ -45,14 +44,18 @@
         <li><a href="#" data-tab="manageUsersSection" class="manager-only"><i class="fa-solid fa-users"></i>Manage Users</a></li>
       </ul>
     </nav>
-
-    <div id="dashboardSection" class="card mt-4 manager-only">
+    <!-- Dashboard Section - ENHANCED -->
+<div id="dashboardSection" class="card mt-4 manager-only">
+  <!-- Enhanced Dashboard Header - Narrow Layout -->
   <div class="dashboard-header">
     <div class="dashboard-header-content">
+      <!-- Left: Store Name and Welcome Message -->
       <div class="store-info">
         <div class="store-name">SmartStore 360</div>
         <div id="welcomeMessage" class="welcome-message">Welcome, Manager</div>
       </div>
+     
+      <!-- Right: Date/Time and Last Sync -->
       <div class="time-info">
         <div id="currentDateTime" class="current-datetime">Saturday, October 25, 2025 at 10:27:51 AM</div>
         <div class="sync-info">
@@ -62,11 +65,13 @@
       </div>
     </div>
   </div>
-
   <div class="mb-6">
+    <!-- Rest of the dashboard content remains exactly the same -->
     <h2 class="text-lg font-bold text-dark mb-4">Business Overview</h2>
-    
+   
+    <!-- Key Metrics Cards -->
     <div class="metrics-grid">
+      <!-- Today's Sales -->
       <div class="metric-card green">
         <div class="flex items-center justify-between">
           <div>
@@ -77,7 +82,7 @@
           <i class="fas fa-shopping-cart text-green-300 text-2xl"></i>
         </div>
       </div>
-
+      <!-- Inventory Value -->
       <div class="metric-card blue">
         <div class="flex items-center justify-between">
           <div>
@@ -88,7 +93,7 @@
           <i class="fas fa-warehouse text-blue-300 text-2xl"></i>
         </div>
       </div>
-
+      <!-- Low Stock Alerts -->
       <div class="metric-card orange">
         <div class="flex items-center justify-between">
           <div>
@@ -99,7 +104,7 @@
           <i class="fas fa-exclamation-triangle text-orange-300 text-2xl"></i>
         </div>
       </div>
-
+      <!-- Out of Stock -->
       <div class="metric-card red">
         <div class="flex items-center justify-between">
           <div>
@@ -111,9 +116,11 @@
         </div>
       </div>
     </div>
-
+    <!-- Two Column Layout -->
     <div class="dashboard-grid">
+      <!-- Left Column: Recent Activity & Quick Actions -->
       <div class="space-y-6">
+        <!-- Quick Actions -->
         <div class="card">
           <h3 class="text-lg font-bold text-dark mb-4">Quick Actions</h3>
           <div class="quick-actions-container">
@@ -128,7 +135,7 @@
                 </div>
               </div>
             </button>
-            
+           
             <button id="quickActionViewInventory" class="quick-action-btn">
               <div class="btn-content">
                 <div class="btn-icon">
@@ -140,7 +147,7 @@
                 </div>
               </div>
             </button>
-            
+           
             <button id="quickActionViewReports" class="quick-action-btn">
               <div class="btn-content">
                 <div class="btn-icon">
@@ -152,7 +159,7 @@
                 </div>
               </div>
             </button>
-            
+           
             <button id="refreshDashboard" class="quick-action-btn">
               <div class="btn-content">
                 <div class="btn-icon">
@@ -166,7 +173,7 @@
             </button>
           </div>
         </div>
-
+        <!-- Recent Sales Activity -->
         <div class="card">
           <h3 class="text-lg font-bold text-dark mb-4">Recent Sales</h3>
           <div id="recentSales" class="space-y-2">
@@ -174,18 +181,20 @@
           </div>
         </div>
       </div>
-
+      <!-- Right Column: Alerts & Performance -->
       <div class="space-y-6">
+        <!-- Stock Alerts -->
         <div class="card">
           <h3 class="text-lg font-bold text-dark mb-4">Stock Alerts</h3>
           <div id="stockAlerts" class="space-y-2">
             <p class="text-center text-secondary py-4"><i class="fas fa-spinner fa-spin mr-2"></i>Loading alerts...</p>
           </div>
         </div>
-
+        <!-- Performance Summary - ENHANCED -->
         <div class="card">
           <h3 class="text-lg font-bold text-dark mb-4">Performance Summary</h3>
           <div id="performanceSummary" class="space-y-4">
+            <!-- Sales Metrics -->
             <div class="space-y-3">
               <div class="flex justify-between items-center">
                 <span class="text-secondary">This Week's Sales</span>
@@ -200,7 +209,8 @@
                 <span class="font-bold text-dark" id="turnoverRate">0%</span>
               </div>
             </div>
-            
+           
+            <!-- Top 5 Selling Items -->
             <div class="mt-4 pt-4 border-t border-gray-600">
               <h4 class="font-semibold text-dark mb-3">Top 5 Selling Items</h4>
               <div id="topSellingItems" class="space-y-2">
@@ -213,6 +223,7 @@
     </div>
   </div>
 </div>
+    <!-- Sales Section -->
     <div id="salesSection" class="card mt-4 hidden">
       <div class="sales-form-container">
         <div class="flex justify-between items-center mb-4">
@@ -237,7 +248,7 @@
         <button type="button" id="deleteLastSaleButton" class="p-2 bg-error text-white rounded">Delete Last Sale</button>
       </div>
     </div>
-
+    <!-- Inventory Section -->
     <div id="inventorySection" class="card mt-4 hidden">
       <div class="mb-4">
         <div class="table-info"><div class="row-count" id="rowCount">Loading...</div>
@@ -266,7 +277,7 @@
         <div class="pagination" id="inventoryPagination"></div>
       </div>
     </div>
-
+    <!-- Reports Section -->
     <div id="reportsSection" class="card mt-4 hidden">
       <form id="reportsForm" class="mb-4">
         <div class="flex items-center space-x-2 flex-wrap">
@@ -282,7 +293,7 @@
       </form>
       <div id="reportsOutput" class="card"></div>
     </div>
-
+    <!-- Change Password Section -->
     <div id="changePasswordSection" class="card mt-4 hidden">
       <form id="changePasswordForm" class="w-1-3 mx-auto">
         <div id="userSelectContainer" class="mb-4 manager-only"><label for="userSelect" class="block text-secondary">Select User</label><select id="userSelect"></select></div>
@@ -292,7 +303,7 @@
         <button type="submit" class="w-full p-2 bg-primary text-white rounded">Change Password</button>
       </form>
     </div>
-
+    <!-- Manage Users Section -->
     <div id="manageUsersSection" class="card mt-4 hidden">
       <div class="mb-4 flex flex-col space-y-4">
         <div class="flex items-center space-x-2 flex-wrap">
@@ -307,7 +318,7 @@
         </div>
       </div>
     </div>
-
+    <!-- Modals -->
     <div id="addInventoryModal" class="fixed inset-0 bg-black-50 flex items-center justify-center hidden modal">
       <div class="card w-1-3">
         <h2 class="text-lg font-bold mb-4 text-dark">Add Inventory Item</h2>
@@ -325,7 +336,6 @@
         </form>
       </div>
     </div>
-
     <div id="editInventoryModal" class="fixed inset-0 bg-black-50 flex items-center justify-center hidden modal">
       <div class="card w-1-3">
         <h2 class="text-lg font-bold mb-4 text-dark">Update Inventory Item</h2>
@@ -354,7 +364,6 @@
         </form>
       </div>
     </div>
-
     <div id="bulkUploadModal" class="fixed inset-0 bg-black-50 flex items-center justify-center hidden modal">
       <div class="card w-1-3">
         <h2 class="text-lg font-bold mb-4 text-dark">Bulk Upload Inventory</h2>
@@ -367,7 +376,6 @@
         </form>
       </div>
     </div>
-
     <div id="InventoryValueModal" class="fixed inset-0 bg-black-50 flex items-center justify-center hidden modal">
       <div class="card w-1-3">
         <h2 class="text-lg font-bold mb-4 text-dark">Inventory Value</h2>
@@ -375,7 +383,6 @@
         <div class="flex justify-end"><button type="button" id="closeInventoryValueButton" class="p-2 bg-neutral text-white rounded">Close</button></div>
       </div>
     </div>
-
     <div id="addUserModal" class="fixed inset-0 bg-black-50 flex items-center justify-center hidden modal">
       <div class="card w-1-3">
         <h2 class="text-lg font-bold mb-4 text-dark">Add User</h2>
@@ -392,7 +399,6 @@
         </form>
       </div>
     </div>
-
     <div id="deleteUserModal" class="fixed inset-0 bg-black-50 flex items-center justify-center hidden modal">
       <div class="card w-1/3">
         <h2 class="text-lg font-bold mb-4 text-dark">Delete User</h2>
@@ -405,7 +411,6 @@
         </form>
       </div>
     </div>
-
     <div id="confirmDeleteModal" class="fixed inset-0 bg-black-50 flex items-center justify-center hidden modal">
       <div class="card"><p id="confirmDeleteMessage"></p>
         <div class="flex justify-end space-x-2">
@@ -415,28 +420,6 @@
       </div>
     </div>
   </div>
-
-  <script src="api-connector.js"></script>
-  <script src="app.js" defer></script>
-  <script>
-// Check authentication on main page
-document.addEventListener('DOMContentLoaded', function() {
-    const token = localStorage.getItem('authToken');
-    const user = localStorage.getItem('currentUser');
-    
-    console.log('🔐 Main page auth check:');
-    console.log('Token:', token);
-    console.log('User:', user);
-    
-    if (!token || !user) {
-        console.log('❌ Not authenticated, redirecting to login...');
-        window.location.href = 'login.html';
-    } else {
-        console.log('✅ Authenticated, loading app...');
-        // Your app will initialize normally
-    }
-});
-</script>
+  <script src="script.js"></script>
 </body>
 </html>
-
