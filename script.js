@@ -2401,3 +2401,4 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log('Make sure to update CONFIG.gasWebAppUrl in script.js with your actual GAS Web App URL');
 });
 
+
