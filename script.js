@@ -18,64 +18,88 @@ function showSection(id) {
   if (el) el.classList.remove('hidden');
 }
 function hideLogin() {
-  document.getElementById('loginForm').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
+  const login = document.getElementById('loginForm');
+  const app = document.getElementById('app');
+  if (login) login.classList.add('hidden');
+  if (app) app.classList.remove('hidden');
 }
 function showLogin() {
-  document.getElementById('loginForm').classList.remove('hidden');
-  document.getElementById('app').classList.add('hidden');
+  const login = document.getElementById('loginForm');
+  const app = document.getElementById('app');
+  if (login) login.classList.remove('hidden');
+  if (app) app.classList.add('hidden');
 }
 
-/* ==================== DOM LOADED ==================== */
+/* ==================== DOM READY ==================== */
 document.addEventListener('DOMContentLoaded', () => {
-  // Now elements exist
+  console.log('DOM loaded. Attaching listeners...');
 
-  /* ==================== LOGIN ==================== */
+  /* ==================== LOGIN FORM ==================== */
   const loginForm = document.getElementById('login');
-  if (loginForm) {
-    loginForm.addEventListener('submit', e => {
-      e.preventDefault();
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value;
-      const err = document.getElementById('loginError');
-
-      if (!username || !password) {
-        err.textContent = 'Enter username and password';
-        return;
-      }
-      err.textContent = 'Signing in...';
-
-      runGoogle(() => {
-        google.script.run
-          .withSuccessHandler(res => {
-            if (res.success) {
-              currentUser = res.user;
-              err.textContent = '';
-              hideLogin();
-              loadDashboard();
-              initNavigation();
-              updateTime();
-              document.getElementById('welcomeMessage').textContent = `Welcome, ${res.user.username}`;
-            } else {
-              err.textContent = res.message || 'Login failed';
-            }
-          })
-          .withFailureHandler(() => {
-            err.textContent = 'Connection failed';
-          })
-          .login(username, password);
-      });
-    });
+  if (!loginForm) {
+    console.error('Login form not found! Check ID: login');
+    return;
   }
 
-  /* ==================== LOGOUT ==================== */
-  document.getElementById('logoutButton')?.addEventListener('click', () => {
-    currentUser = null;
-    document.getElementById('username').value = '';
-    document.getElementById('password').value = '';
-    document.getElementById('loginError').textContent = '';
-    showLogin();
+  loginForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const errorEl = document.getElementById('loginError');
+
+    if (!usernameInput || !passwordInput || !errorEl) {
+      console.error('Login inputs missing');
+      return;
+    }
+
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!username || !password) {
+      errorEl.textContent = 'Enter username and password';
+      return;
+    }
+
+    errorEl.textContent = 'Signing in...';
+
+    runGoogle(() => {
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res.success) {
+            currentUser = res.user;
+            errorEl.textContent = '';
+            hideLogin();
+            loadDashboard();
+            initNavigation();
+            updateTime();
+            const welcome = document.getElementById('welcomeMessage');
+            if (welcome) welcome.textContent = `Welcome, ${res.user.username}`;
+          } else {
+            errorEl.textContent = res.message || 'Login failed';
+          }
+        })
+        .withFailureHandler(err => {
+          console.error('Login failed:', err);
+          errorEl.textContent = 'Connection failed';
+        })
+        .login(username, password);
+    });
   });
+
+  /* ==================== LOGOUT ==================== */
+  const logoutBtn = document.getElementById('logoutButton');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      currentUser = null;
+      const u = document.getElementById('username');
+      const p = document.getElementById('password');
+      const e = document.getElementById('loginError');
+      if (u) u.value = '';
+      if (p) p.value = '';
+      if (e) e.textContent = '';
+      showLogin();
+    });
+  }
 
   /* ==================== NAVIGATION ==================== */
   function initNavigation() {
@@ -84,7 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ev.preventDefault();
         const tab = link.getAttribute('data-tab');
         showSection(tab);
-        document.getElementById('activeTabName').textContent = link.textContent.trim();
+        const title = document.getElementById('activeTabName');
+        if (title) title.textContent = link.textContent.trim();
       });
     });
   }
@@ -96,13 +121,17 @@ document.addEventListener('DOMContentLoaded', () => {
         .withSuccessHandler(data => {
           if (!data.success) return;
           const d = data.data;
-          document.getElementById('todaySales').textContent = `GHC ${d.todaysSalesAmount.toFixed(2)}`;
-          document.getElementById('todaySalesCount').textContent = `${d.todaysTransactionCount} transaction${d.todaysTransactionCount === 1 ? '' : 's'}`;
-          document.getElementById('inventoryValue').textContent = `GHC ${d.inventoryValue.toFixed(2)}`;
-          document.getElementById('totalItems').textContent = `${d.inventoryItemCount} item${d.inventoryItemCount === 1 ? '' : 's'}`;
-          document.getElementById('lowStockCount').textContent = d.lowStockCount;
-          document.getElementById('outOfStockCount').textContent = d.outOfStockCount;
-          document.getElementById('lastSyncTime').textContent = new Date().toLocaleTimeString();
+          const update = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+          };
+          update('todaySales', `GHC ${d.todaysSalesAmount.toFixed(2)}`);
+          update('todaySalesCount', `${d.todaysTransactionCount} transaction${d.todaysTransactionCount === 1 ? '' : 's'}`);
+          update('inventoryValue', `GHC ${d.inventoryValue.toFixed(2)}`);
+          update('totalItems', `${d.inventoryItemCount} item${d.inventoryItemCount === 1 ? '' : 's'}`);
+          update('lowStockCount', d.lowStockCount);
+          update('outOfStockCount', d.outOfStockCount);
+          update('lastSyncTime', new Date().toLocaleTimeString());
         })
         .getDashboardOverview();
     });
@@ -117,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
       google.script.run
         .withSuccessHandler(res => {
           const container = document.getElementById('recentSales');
+          if (!container) return;
           container.innerHTML = '';
           if (!res.success || !res.data.length) {
             container.innerHTML = '<p class="text-center text-secondary">No recent sales</p>';
@@ -141,6 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
       google.script.run
         .withSuccessHandler(res => {
           const container = document.getElementById('stockAlerts');
+          if (!container) return;
           container.innerHTML = '';
           if (!res.success || !res.data.length) {
             container.innerHTML = '<p class="text-center text-secondary">All items in stock</p>';
@@ -163,11 +194,16 @@ document.addEventListener('DOMContentLoaded', () => {
         .withSuccessHandler(res => {
           if (!res.success) return;
           const d = res.data;
-          document.getElementById('weeklySales').textContent = `GHC ${d.weekSales.toFixed(2)}`;
-          document.getElementById('monthlySales').textContent = `GHC ${d.monthSales.toFixed(2)}`;
-          document.getElementById('turnoverRate').textContent = `${d.inventoryTurnover.toFixed(1)}%`;
+          const update = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+          };
+          update('weeklySales', `GHC ${d.weekSales.toFixed(2)}`);
+          update('monthlySales', `GHC ${d.monthSales.toFixed(2)}`);
+          update('turnoverRate', `${d.inventoryTurnover.toFixed(1)}%`);
 
           const top = document.getElementById('topSellingItems');
+          if (!top) return;
           top.innerHTML = '';
           if (d.topSellingItems.length === 0) {
             top.innerHTML = '<p class="text-center text-secondary">No data</p>';
@@ -187,15 +223,16 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ==================== TIME ==================== */
   function updateTime() {
     const now = new Date();
-    document.getElementById('currentDateTime').textContent = now.toLocaleString();
+    const el = document.getElementById('currentDateTime');
+    if (el) el.textContent = now.toLocaleString();
     setTimeout(updateTime, 1000);
   }
 
-  /* ==================== INITIAL LOAD ==================== */
+  /* ==================== INITIALIZE ==================== */
   showLogin();
   updateTime();
 
-  // Expose for later use
+  // Expose globally
   window.loadDashboard = loadDashboard;
   window.initNavigation = initNavigation;
 });
