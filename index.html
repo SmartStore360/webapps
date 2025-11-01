@@ -420,16 +420,23 @@
       </div>
     </div>
   </div>
-  <script src="https://apis.google.com/js/api.js"></script>
-  <script src="script.js"></script>
-    <!-- Load Google API first -->
+  <!-- Google Apps Script API -->
   <script src="https://apis.google.com/js/api.js"></script>
 
-  <!-- Then load your script -->
+  <!-- Wait for Google API to load -->
+  <script>
+    function onGoogleLoad() {
+      // This tells your script.js that Google is ready
+      window.googleScriptReady = true;
+    }
+  </script>
+  <script src="https://apis.google.com/js/api.js" onload="onGoogleLoad()"></script>
+
+  <!-- Your app code -->
   <script src="script.js"></script>
 </body>
 </html>
-</body>
 </html>
+
 
 
