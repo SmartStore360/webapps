@@ -1,7 +1,7 @@
 // Updated API Service in app.js
 class GASApiService {
     constructor() {
-        this.baseUrl = 'https://script.google.com/macros/s/AKfycbxs_M_Ht793D0LzJt3D3yG6hcUKheojxSrK1I5cesnkmjlUukXxtJZGpOPew5MzXOosnw/exec; // Replace with your deployed GAS web app URL
+        this.baseUrl = 'https://script.google.com/macros/s/AKfycbxt3YCGpklAkdAkRUPMMswrFbHzDDCZA_2oHBaWf81jOgtDSL_yv3T526IJ5znaEiOn/exec'; // Replace with your deployed GAS web app URL
         this.token = localStorage.getItem('authToken');
         this.sessionId = localStorage.getItem('sessionId');
     }
